@@ -1,0 +1,833 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Estadísticas de Accidentalidad - La Movida de SST</title>
+    
+    <!-- REACT CORE -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- ESTILOS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- LIBRERÍAS DE EXPORTACIÓN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+    
+    <style>
+        body { background-color: #f8fafc; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        .input-field {
+            width: 100%;
+            padding: 0.5rem;
+            border: 1px solid #cbd5e1;
+            border-radius: 0.375rem;
+            font-size: 0.875rem;
+            transition: all 0.2s;
+        }
+        .input-field:focus { border-color: #00b050; outline: none; box-shadow: 0 0 0 3px rgba(0, 176, 80, 0.2); }
+        
+        .label-text {
+            display: block;
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: #475569;
+            margin-bottom: 0.25rem;
+            text-transform: uppercase;
+        }
+
+        .export-loader {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(255, 255, 255, 0.95); z-index: 9999;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+        }
+        .spinner {
+            border: 4px solid #f3f3f3; border-top: 4px solid #00b050; border-radius: 50%;
+            width: 50px; height: 50px; animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        
+        /* Botones y UI */
+        .header-btn {
+            display: flex; align-items: center; gap: 0.5rem; 
+            padding: 0.5rem 0.75rem; border-radius: 0.375rem; 
+            font-size: 0.75rem; font-weight: 600; 
+            transition: all 0.2s; white-space: nowrap;
+            cursor: pointer;
+        }
+        .btn-action { background-color: #ffffff; color: #475569; border: 1px solid #e2e8f0; box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); }
+        .btn-action:hover { background-color: #f8fafc; color: #1e293b; border-color: #cbd5e1; }
+        
+        .btn-primary-action { background-color: #00b050; color: white; border: 1px solid #00b050; }
+        .btn-primary-action:hover { background-color: #008a3e; }
+        
+        .btn-danger-action { color: #ef4444; background-color: #fff; border: 1px solid #fecaca; }
+        .btn-danger-action:hover { background-color: #fef2f2; color: #dc2626; }
+
+        .btn-warn-action { color: #d97706; background-color: #fff; border: 1px solid #fde68a; }
+        .btn-warn-action:hover { background-color: #fffbeb; color: #b45309; }
+
+        /* Modal Overlay */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.5); z-index: 10000;
+            display: flex; justify-content: center; align-items: center;
+        }
+        .modal-content {
+            background: white; padding: 2rem; border-radius: 0.75rem;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            max-width: 400px; width: 90%; text-align: center;
+        }
+
+        @media print {
+            .no-print { display: none !important; }
+            body { background: white; }
+            .shadow-sm { box-shadow: none !important; }
+            .border { border: 1px solid #ddd !important; }
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useMemo, useRef, useEffect } = React;
+        const { jsPDF } = window.jspdf;
+
+        // --- CONFIGURACIÓN E INICIALIZACIÓN ---
+        const BRAND_COLOR = '#00b050'; 
+        const NEUTRAL_COLOR = '#334155';
+        const NEUTRAL_LIGHT = '#475569';
+        const BORDER_COLOR = '#e2e8f0';
+        const DEMO_YEAR = 2024;
+
+        const MONTHS = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+        const VENEZUELA_STATES = ['Amazonas', 'Anzoátegui', 'Apure', 'Aragua', 'Barinas', 'Bolívar', 'Carabobo', 'Cojedes', 'Delta Amacuro', 'Distrito Capital', 'Falcón', 'Guárico', 'La Guaira', 'Lara', 'Mérida', 'Miranda', 'Monagas', 'Nueva Esparta', 'Portuguesa', 'Sucre', 'Táchira', 'Trujillo', 'Yaracuy', 'Zulia', 'Dependencias Federales'];
+        const INITIAL_DEPARTMENTS = ['Producción', 'Mantenimiento', 'Logística', 'Administración', 'Ventas', 'Seguridad', 'Obras'];
+        const INITIAL_BRANCHES = [{ id: 'b1', name: 'Sede Principal', state: 'Distrito Capital' }];
+        
+        const INITIAL_FORM = { 
+            month: 'Enero', year: new Date().getFullYear(), department: '', branchId: '', 
+            hours: '', workers: '', 
+            work_accLostTime: '0', work_accNoLostTime: '0', work_daysLost: '0', work_daysCharged: '0', 
+            itinere_acc: '0', itinere_daysLost: '0', itinere_daysCharged: '0', 
+            mission_acc: '0', mission_daysLost: '0', mission_daysCharged: '0', 
+            recreation_acc: '0', recreation_daysLost: '0', recreation_daysCharged: '0' 
+        };
+        
+        const EVENT_TYPES = ['Todos', 'Trabajo', 'Itinere', 'Misión', 'Recreativo'];
+        const YEARS = Array.from({length: 16}, (_, i) => 2025 + i);
+
+        // --- COMPONENTES SVG ---
+        const Icon = ({ d, ...props }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+                <path d={d} />
+                {props.children}
+            </svg>
+        );
+        
+        const Icons = {
+            Activity: (p) => <Icon d="M22 12h-4l-3 9L9 3l-3 9H2" {...p}/>,
+            Save: (p) => <Icon d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" {...p}><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></Icon>,
+            Trash2: (p) => <Icon d="M3 6h18" {...p}><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></Icon>,
+            Download: (p) => <Icon d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" {...p}><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></Icon>,
+            Upload: (p) => <Icon d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" {...p}><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></Icon>,
+            BarChart3: (p) => <Icon d="M18 20V10" {...p}><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></Icon>,
+            TrendingUp: (p) => <Icon d="M23 6l-9.5 9.5-5-5L1 18" {...p}><polyline points="17 6 23 6 23 12"/></Icon>,
+            Calendar: (p) => <Icon d="M3 4h18v18H3z" {...p}><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></Icon>,
+            Briefcase: (p) => <Icon d="M20 7h-3a2 2 0 0 0-2-2h-6a2 2 0 0 0-2 2H4" {...p}><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/></Icon>,
+            Truck: (p) => <Icon d="M1 3h15v13H1z" {...p}><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></Icon>,
+            Plane: (p) => <Icon d="M2 12h5l8-9 2 1-4 8h5l4-3 2 1-7 10h-2l2-8H2z" {...p}/>,
+            PartyPopper: (p) => <Icon d="M5.8 11.3 2 22l10.7-3.79" {...p}><path d="M4 3h.01"/><path d="M22 8h.01"/><path d="M15 2h.01"/><path d="M22 20h.01"/></Icon>,
+            Building2: (p) => <Icon d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z" {...p}><path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/></Icon>,
+            Filter: (p) => <Icon d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z" {...p}/>,
+            PieChart: (p) => <Icon d="M21.21 15.89A10 10 0 1 1 8 2.83" {...p}><path d="M22 12A10 10 0 0 0 12 2v10z"/></Icon>,
+            Globe: (p) => <Icon d="M2 12h20" {...p}><circle cx="12" cy="12" r="10"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10z"/></Icon>,
+            User: (p) => <Icon d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" {...p}><circle cx="12" cy="7" r="4"/></Icon>,
+            Settings: (p) => <Icon d="M12.22 2h-.44a2 2 0 0 1-2-1.08l-.12-.24a2 2 0 0 0-3.4 0l-.12.24a2 2 0 0 1-2 1.08H3.9c-.98 0-1.82.75-1.89 1.73l-.11 1.56a2 2 0 0 1-1.38 1.86l-.24.08a2 2 0 0 0 0 3.78l.24.08a2 2 0 0 1 1.38 1.86l.11 1.56c.07.98.91 1.73 1.89 1.73h.22a2 2 0 0 1 2 1.08l.12.24a2 2 0 0 0 3.4 0l.12-.24a2 2 0 0 1 2-1.08h.22c.98 0 1.82-.75 1.89-1.73l.11-1.56a2 2 0 0 1 1.38-1.86l.24-.08a2 2 0 0 0 0-3.78l-.24-.08a2 2 0 0 1-1.38-1.86l-.11-1.56c-.07-.98-.91-1.73-1.89-1.73z" {...p}><circle cx="12" cy="12" r="3"/></Icon>,
+            Plus: (p) => <Icon d="M12 5v14" {...p}><line x1="5" y1="12" x2="19" y2="12"/></Icon>,
+            X: (p) => <Icon d="M18 6L6 18" {...p}><line x1="6" y1="6" x2="18" y2="18"/></Icon>,
+            Edit2: (p) => <Icon d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" {...p}/>,
+            RefreshCw: (p) => <Icon d="M23 4v6h-6" {...p}><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></Icon>,
+            Check: (p) => <Icon d="M20 6L9 17l-5-5" {...p}/>,
+            AlertCircle: (p) => <Icon d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z" {...p}><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></Icon>,
+            Database: (p) => <Icon d="M12 22c4.97 0 9-1.79 9-4s-4.03-4-9-4-9 1.79-9 4 4.03 4 9 4z" {...p}><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></Icon>,
+            FileText: (p) => <Icon d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" {...p}><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></Icon>,
+            Calculator: (p) => <Icon d="M16 2H8a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2z" {...p}><line x1="10" y1="12" x2="14" y2="12"/><line x1="10" y1="16" x2="14" y2="16"/></Icon>,
+            BookOpen: (p) => <Icon d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" {...p}><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></Icon>,
+            Info: (p) => <Icon d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z" {...p}><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></Icon>,
+            MapPin: (p) => <Icon d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" {...p}><circle cx="12" cy="10" r="3"/></Icon>,
+            Map: (p) => <Icon d="M1 6v16l7-4 8 4 7-4V2l-7 4-8-4-7 4z" {...p}><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></Icon>,
+            Printer: (p) => <Icon d="M6 9V2h12v7" {...p}><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></Icon>,
+            Camera: (p) => <Icon d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" {...p}><circle cx="12" cy="13" r="4"/></Icon>,
+            Layout: (p) => <Icon d="M3 3h18v18H3z" {...p}><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></Icon>,
+            RotateCcw: (p) => <Icon d="M1 4v6h6" {...p}><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></Icon>,
+            Mail: (p) => <Icon d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" {...p}><polyline points="22,6 12,13 2,6" /></Icon>,
+            Phone: (p) => <Icon d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" {...p} />
+        };
+
+        const safeCalc = (num, den, factor = 1) => {
+            const n = parseFloat(num) || 0;
+            const d = parseFloat(den) || 0;
+            if (d === 0) return "0.00";
+            return ((n * factor) / d).toFixed(2);
+        };
+
+        // --- UTILIDADES ---
+        const triggerDownload = (canvas, filename) => {
+            const link = document.createElement('a');
+            link.download = `${filename}.png`;
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+        };
+
+        // --- FUNCIÓN DE CAPTURA PNG MEJORADA ---
+        const downloadElementAsPng = async (elementId, filename) => {
+            const element = document.getElementById(elementId);
+            if (!element) return;
+
+            try {
+                // Usamos html2canvas para TODO (gráficos y tablas)
+                // Es más confiable para capturar contenedores con estilos y texto
+                const canvas = await html2canvas(element, { 
+                    scale: 2, 
+                    backgroundColor: '#ffffff', // Fondo blanco forzado para evitar transparencia/negro
+                    useCORS: true,
+                    logging: false,
+                    ignoreElements: (el) => el.classList.contains('no-print') // Evitar capturar botones de acción
+                });
+                triggerDownload(canvas, filename);
+            } catch (err) {
+                console.error("Error exporting PNG:", err);
+                alert("Error al exportar imagen. Intente en un navegador de escritorio.");
+            }
+        };
+
+        // --- COMPONENTE PRINCIPAL ---
+        function App() {
+            // ESTADOS
+            const [records, setRecords] = useState([]);
+            const [departments, setDepartments] = useState(INITIAL_DEPARTMENTS);
+            const [branches, setBranches] = useState(INITIAL_BRANCHES);
+            const [kValue, setKValue] = useState(1000000);
+            const [view, setView] = useState('dashboard');
+            const [formData, setFormData] = useState({...INITIAL_FORM, department: 'Producción', branchId: 'b1'});
+            const [editingId, setEditingId] = useState(null);
+            const [filterDept, setFilterDept] = useState('Todos');
+            const [filterBranch, setFilterBranch] = useState('Todos');
+            const [filterYear, setFilterYear] = useState(2024);
+            const [filterType, setFilterType] = useState('Todos'); // NUEVO FILTRO
+            const [notification, setNotification] = useState(null);
+            const [billboardMode, setBillboardMode] = useState(false);
+            const [isExporting, setIsExporting] = useState(false);
+            const [showResetModal, setShowResetModal] = useState(false); // NUEVO ESTADO PARA EL MODAL
+
+            const [newDeptName, setNewDeptName] = useState('');
+            const [newBranchName, setNewBranchName] = useState('');
+            const [newBranchState, setNewBranchState] = useState(VENEZUELA_STATES[9]);
+
+            const fileInputRef = useRef(null);
+
+            useEffect(() => {
+                if (departments.length > 0 && (!formData.department || !departments.includes(formData.department))) {
+                    setFormData(prev => ({ ...prev, department: departments[0] }));
+                }
+                if (branches.length > 0 && (!formData.branchId || !branches.find(b => b.id === formData.branchId))) {
+                    setFormData(prev => ({ ...prev, branchId: branches[0].id }));
+                }
+            }, [departments, branches]);
+
+            useEffect(() => {
+                if (notification) {
+                    const timer = setTimeout(() => setNotification(null), 3000);
+                    return () => clearTimeout(timer);
+                }
+            }, [notification]);
+
+            // CÁLCULOS
+            const filteredRecords = useMemo(() => {
+                return records.filter(r => {
+                    const matchDept = filterDept === 'Todos' || r.department === filterDept;
+                    const matchBranch = filterBranch === 'Todos' || r.branchId === filterBranch;
+                    const matchYear = Number(r.year) === Number(filterYear);
+                    return matchDept && matchBranch && matchYear;
+                });
+            }, [records, filterDept, filterBranch, filterYear]);
+
+            const monthlyStats = useMemo(() => {
+                const map = {};
+                filteredRecords.forEach(r => {
+                    const k = r.month;
+                    // Inicializar con todos los contadores a 0
+                    if(!map[k]) map[k] = { 
+                        month: k, year: r.year, hours:0, workers:0, c:0, 
+                        dL:0, dC:0, aL:0, aNL:0, accT:0, 
+                        iti:0, itiD:0, // Itinere + Days
+                        mis:0, misD:0, // Mission + Days
+                        rec:0, recD:0  // Rec + Days
+                    };
+                    map[k].hours += Number(r.hours); 
+                    map[k].workers += Number(r.workers); 
+                    map[k].c++;
+                    map[k].dL += Number(r.work_daysLost); 
+                    map[k].dC += Number(r.work_daysCharged);
+                    map[k].aL += Number(r.work_accLostTime); 
+                    map[k].aNL += Number(r.work_accNoLostTime);
+                    map[k].accT += (Number(r.work_accLostTime) + Number(r.work_accNoLostTime));
+                    
+                    // Sumar específicos
+                    map[k].iti += Number(r.itinere_acc);
+                    map[k].itiD += (Number(r.itinere_daysLost) + Number(r.itinere_daysCharged));
+                    map[k].mis += Number(r.mission_acc);
+                    map[k].misD += (Number(r.mission_daysLost) + Number(r.mission_daysCharged));
+                    map[k].rec += Number(r.recreation_acc);
+                    map[k].recD += (Number(r.recreation_daysLost) + Number(r.recreation_daysCharged));
+                });
+
+                return MONTHS.map(m => {
+                    const d = map[m] || { month: m, hours:0, workers:0, c:1, dL:0, dC:0, aL:0, aNL:0, accT:0, iti:0, itiD:0, mis:0, misD:0, rec:0, recD:0 };
+                    const wAvg = Math.round(d.workers / (d.c||1));
+                    
+                    // Lógica para seleccionar qué mostrar según el filtro
+                    let filteredCount = 0;
+                    let filteredDays = 0;
+
+                    if (filterType === 'Todos' || filterType === 'Trabajo') {
+                        filteredCount = d.accT;
+                        filteredDays = d.dL + d.dC;
+                    } else if (filterType === 'Itinere') {
+                        filteredCount = d.iti;
+                        filteredDays = d.itiD;
+                    } else if (filterType === 'Misión') {
+                        filteredCount = d.mis;
+                        filteredDays = d.misD;
+                    } else if (filterType === 'Recreativo') {
+                        filteredCount = d.rec;
+                        filteredDays = d.recD;
+                    }
+
+                    return {
+                        month: m, hours: d.hours, workersAvg: wAvg, 
+                        totalWorkAcc: d.accT, // Siempre disponible para la tabla
+                        ifn: safeCalc(d.aL, d.hours, kValue),
+                        ifb: safeCalc(d.accT, d.hours, kValue),
+                        is: safeCalc(d.dL + d.dC, d.hours, kValue),
+                        
+                        itinere_acc: d.iti, mission_acc: d.mis, recreation_acc: d.rec,
+                        
+                        // Propiedades dinámicas para gráficos
+                        dynamicCount: filteredCount,
+                        dynamicDays: filteredDays
+                    };
+                });
+            }, [filteredRecords, kValue, filterType]);
+
+            const globalStats = useMemo(() => {
+                // Calcular totales globales sumando el array mensual ya procesado
+                return monthlyStats.reduce((acc, curr) => ({
+                    hours: acc.hours + curr.hours,
+                    totalWorkAcc: acc.totalWorkAcc + curr.totalWorkAcc,
+                    itinere: acc.itinere + curr.itinere_acc,
+                    mission: acc.mission + curr.mission_acc,
+                    rec: acc.rec + curr.recreation_acc,
+                    
+                    // Indices globales (solo trabajo)
+                    ifn: safeCalc(filteredRecords.reduce((s,r)=>s+Number(r.work_accLostTime),0), acc.hours + curr.hours, kValue), // Recalculo preciso no incremental
+                    ifb: safeCalc(filteredRecords.reduce((s,r)=>s+(Number(r.work_accLostTime)+Number(r.work_accNoLostTime)),0), acc.hours + curr.hours, kValue),
+                    is: safeCalc(filteredRecords.reduce((s,r)=>s+(Number(r.work_daysLost)+Number(r.work_daysCharged)),0), acc.hours + curr.hours, kValue),
+                    
+                    // Dinámicos
+                    dynamicCountTotal: acc.dynamicCountTotal + curr.dynamicCount,
+                    dynamicDaysTotal: acc.dynamicDaysTotal + curr.dynamicDays
+                }), { hours: 0, totalWorkAcc: 0, itinere: 0, mission: 0, rec: 0, dynamicCountTotal: 0, dynamicDaysTotal: 0 });
+            }, [monthlyStats, filteredRecords, kValue]);
+
+            // --- EXPORTACIÓN PDF (CORREGIDA - CLON VISIBLE) ---
+            const handleDownloadPDF = async () => {
+                setIsExporting(true);
+                
+                // Asegurar que estamos en el dashboard
+                if(view !== 'dashboard') {
+                    setView('dashboard');
+                    await new Promise(r => setTimeout(r, 100)); // Breve espera para renderizado de React
+                }
+
+                const element = document.getElementById('app-container');
+                if (!element) { setIsExporting(false); return; }
+
+                // Guardar scroll original
+                const originalScrollPos = window.scrollY;
+                window.scrollTo(0, 0);
+
+                try {
+                    // 1. CREAR CONTENEDOR DE CLON (VISIBLE)
+                    // Usamos z-index positivo y fondo blanco para asegurar que el motor de renderizado lo pinte.
+                    const cloneContainer = document.createElement('div');
+                    cloneContainer.style.position = 'absolute';
+                    cloneContainer.style.top = '0';
+                    cloneContainer.style.left = '0';
+                    cloneContainer.style.width = '100%'; // Ancho completo
+                    cloneContainer.style.zIndex = '10000'; // Encima de todo (no fantasma)
+                    cloneContainer.style.backgroundColor = '#ffffff'; // Fondo sólido
+                    cloneContainer.style.pointerEvents = 'none'; // Evitar interacción
+                    document.body.appendChild(cloneContainer);
+
+                    // 2. CLONAR NODO
+                    const clonedNode = element.cloneNode(true);
+                    
+                    // Ajustes de estilo al clon para asegurar que se vea todo
+                    clonedNode.style.height = 'auto';
+                    clonedNode.style.overflow = 'visible';
+                    clonedNode.style.maxHeight = 'none';
+                    
+                    // Ocultar botones en el clon
+                    const buttons = clonedNode.querySelectorAll('.no-print');
+                    buttons.forEach(btn => btn.style.display = 'none');
+
+                    // 3. FIX SVGs (Copiar dimensiones computadas)
+                    // html2canvas a veces falla calculando dimensiones de SVG clonados
+                    const originalSvgs = element.querySelectorAll('svg');
+                    const clonedSvgs = clonedNode.querySelectorAll('svg');
+                    originalSvgs.forEach((orig, idx) => {
+                        if (clonedSvgs[idx]) {
+                            const rect = orig.getBoundingClientRect();
+                            clonedSvgs[idx].setAttribute('width', rect.width);
+                            clonedSvgs[idx].setAttribute('height', rect.height);
+                            clonedSvgs[idx].style.width = `${rect.width}px`;
+                            clonedSvgs[idx].style.height = `${rect.height}px`;
+                            clonedSvgs[idx].style.display = 'block';
+                        }
+                    });
+
+                    cloneContainer.appendChild(clonedNode);
+
+                    // Esperar un ciclo de renderizado para asegurar que el clon esté pintado
+                    await new Promise(r => setTimeout(r, 100));
+
+                    // 4. CAPTURAR
+                    // Sin forzar windowWidth/Height, dejamos que html2canvas lea el DOM real
+                    const canvas = await html2canvas(clonedNode, { 
+                        scale: 2, // Alta calidad
+                        useCORS: true, 
+                        backgroundColor: '#ffffff',
+                        logging: false
+                    });
+
+                    // 5. LIMPIEZA INMEDIATA
+                    document.body.removeChild(cloneContainer);
+                    window.scrollTo(0, originalScrollPos);
+
+                    // 6. GENERAR PDF
+                    const imgData = canvas.toDataURL('image/png');
+                    const pdf = new jsPDF('p', 'mm', 'a4');
+                    const pdfWidth = 210; 
+                    const pdfHeight = 297; 
+                    const margin = 10;
+                    const contentWidth = pdfWidth - (2 * margin);
+                    const contentHeight = (canvas.height * contentWidth) / canvas.width;
+                    
+                    // Ajuste de escala si es muy largo
+                    if (contentHeight > (pdfHeight - 20)) {
+                        const ratio = (pdfHeight - 20) / contentHeight;
+                        const scaledWidth = contentWidth * ratio;
+                        const xOffset = margin + (contentWidth - scaledWidth) / 2;
+                        pdf.addImage(imgData, 'PNG', xOffset, margin, scaledWidth, (pdfHeight - 20));
+                    } else {
+                        pdf.addImage(imgData, 'PNG', margin, margin, contentWidth, contentHeight);
+                    }
+
+                    // Nueva página para tabla
+                    pdf.addPage();
+                    pdf.setFontSize(14);
+                    pdf.text(`Detalle de Datos - Año ${filterYear}`, margin, 20);
+                    
+                    const columns = ["Mes", "H.H.E.", "IFN", "IFB", "IS", "Acc.", "Itinere", "Misión", "Rec."];
+                    const rows = monthlyStats.map(r => [ r.month, Number(r.hours).toLocaleString(), r.ifn, r.ifb, r.is, r.totalWorkAcc, r.itinere_acc, r.mission_acc, r.recreation_acc ]);
+                    rows.push(["TOTAL", globalStats.hours.toLocaleString(), globalStats.ifn, globalStats.ifb, globalStats.is, globalStats.totalWorkAcc, globalStats.itinere, globalStats.mission, globalStats.rec]);
+
+                    pdf.autoTable({
+                        head: [columns], body: rows, startY: 30, theme: 'grid',
+                        headStyles: { fillColor: [0, 176, 80], textColor: 255, fontStyle: 'bold' },
+                        footStyles: { fillColor: [51, 65, 85], textColor: 255, fontStyle: 'bold' },
+                        styles: { fontSize: 9, cellPadding: 3 },
+                        didParseRow: function(data) { if (data.row.index === rows.length - 1) { data.row.styles.fontStyle = 'bold'; data.row.styles.fillColor = [220, 220, 220]; } }
+                    });
+
+                    // Pie de página
+                    const totalPages = pdf.internal.getNumberOfPages();
+                    for (let i = 1; i <= totalPages; i++) {
+                        pdf.setPage(i);
+                        pdf.setFontSize(8);
+                        pdf.setTextColor(150);
+                        const str = `Página ${i} de ${totalPages} - Elaborado por: David Linares Brea - www.movidasst.com`;
+                        pdf.text(str, margin, pdfHeight - 10);
+                    }
+
+                    pdf.save(`SST_Reporte_Completo_${filterYear}.pdf`);
+                    setNotification("Reporte Completo Generado");
+
+                } catch (err) {
+                    console.error("Error PDF:", err);
+                    alert("Error al generar PDF. Intente de nuevo.");
+                    // Limpieza de emergencia
+                    const orphan = document.querySelector('div[style*="z-index: 10000"]');
+                    if(orphan) document.body.removeChild(orphan);
+                } finally {
+                    setIsExporting(false);
+                }
+            };
+
+            const confirmReset = () => {
+                setRecords([]); 
+                setDepartments(INITIAL_DEPARTMENTS); 
+                setBranches(INITIAL_BRANCHES); 
+                setKValue(1000000); 
+                setFilterDept('Todos');
+                setFilterBranch('Todos');
+                setFilterType('Todos');
+                setFilterYear(new Date().getFullYear());
+                setFormData({...INITIAL_FORM, department: INITIAL_DEPARTMENTS[0], branchId: INITIAL_BRANCHES[0].id});
+                
+                setShowResetModal(false);
+                setNotification("Sistema reiniciado correctamente.");
+                setView('dashboard');
+            };
+
+            // Handler para abrir el modal
+            const handleReset = () => setShowResetModal(true);
+            const handlePrint = () => { setTimeout(() => window.print(), 500); };
+
+            const loadSampleData = () => {
+                setEditingId(null);
+                setRecords([]); // Limpiar para evitar duplicados visuales
+                setDepartments(['Producción', 'Mantenimiento', 'Logística', 'Administración', 'Ventas']);
+                setBranches([{ id: 'br-ccs', name: 'Sede Principal', state: 'Distrito Capital' }, { id: 'br-val', name: 'Planta Valencia', state: 'Carabobo' }]);
+                
+                const newRecords = [];
+                const rand = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
+                MONTHS.forEach((month, idx) => {
+                    newRecords.push({id: `d1-${idx}`, month, year: 2024, department: 'Administración', branchId: 'br-ccs', hours: 4000, workers: 25, work_accLostTime: 0, work_accNoLostTime: 0, work_daysLost: 0, work_daysCharged: 0, itinere_acc: 0, itinere_daysLost: 0, itinere_daysCharged: 0, mission_acc: 0, mission_daysLost: 0, mission_daysCharged: 0, recreation_acc: 0, recreation_daysLost: 0, recreation_daysCharged: 0});
+                    const acc = Math.random() > 0.7;
+                    newRecords.push({id: `d2-${idx}`, month, year: 2024, department: 'Producción', branchId: 'br-val', hours: 12000, workers: 60, work_accLostTime: acc?1:0, work_accNoLostTime: rand(0,2), work_daysLost: acc?rand(5,15):0, work_daysCharged: 0, itinere_acc: rand(0,1), itinere_daysLost: rand(0,3), itinere_daysCharged: 0, mission_acc: 0, mission_daysLost: 0, mission_daysCharged: 0, recreation_acc: 0, recreation_daysLost: 0, recreation_daysCharged: 0});
+                });
+                
+                // Usar timeout para asegurar renderizado limpio
+                setTimeout(() => {
+                    setRecords(newRecords); 
+                    setFilterYear(2024); 
+                    setFilterDept('Todos'); 
+                    setFilterBranch('Todos'); 
+                    setView('dashboard');
+                    setNotification("Datos demo cargados.");
+                }, 50);
+            };
+            
+            const addBranch = (e) => { e.preventDefault(); if(newBranchName){ setBranches([...branches, {id: Date.now().toString(), name: newBranchName, state: newBranchState}]); setNewBranchName(''); }};
+            const removeBranch = (id) => { if(confirm("¿Borrar sucursal?")) setBranches(branches.filter(b=>b.id!==id)); };
+            const addDept = (e) => { e.preventDefault(); if(newDeptName){ setDepartments([...departments, newDeptName]); setNewDeptName(''); }};
+            const removeDept = (d) => { if(confirm("¿Borrar depto?")) setDepartments(departments.filter(x=>x!==d)); };
+            const handleSubmit = (e) => {
+                e.preventDefault();
+                const newRec = { ...formData, id: Date.now(), year: Number(formData.year), hours: Number(formData.hours), workers: Number(formData.workers), work_accLostTime: Number(formData.work_accLostTime), work_accNoLostTime: Number(formData.work_accNoLostTime), work_daysLost: Number(formData.work_daysLost), work_daysCharged: Number(formData.work_daysCharged), itinere_acc: Number(formData.itinere_acc), itinere_daysLost: Number(formData.itinere_daysLost), itinere_daysCharged: Number(formData.itinere_daysCharged), mission_acc: Number(formData.mission_acc), mission_daysLost: Number(formData.mission_daysLost), mission_daysCharged: Number(formData.mission_daysCharged), recreation_acc: Number(formData.recreation_acc), recreation_daysLost: Number(formData.recreation_daysLost), recreation_daysCharged: Number(formData.recreation_daysCharged) };
+                if(editingId) { setRecords(records.map(r => r.id === editingId ? {...newRec, id: editingId} : r)); setNotification("Actualizado."); setEditingId(null); } else { setRecords([...records, newRec]); setNotification("Guardado."); }
+                const idx = MONTHS.indexOf(formData.month); const nextMonth = MONTHS[(idx + 1) % 12];
+                setFormData({...formData, month: nextMonth, hours: '', workers: '', work_accLostTime: '0', work_accNoLostTime: '0', work_daysLost: '0', work_daysCharged: '0', itinere_acc: '0', mission_acc: '0', recreation_acc: '0', itinere_daysLost: '0', itinere_daysCharged: '0', mission_daysLost: '0', mission_daysCharged: '0', recreation_daysLost: '0', recreation_daysCharged: '0'});
+            };
+            const handleEdit = (r) => { const strRec = Object.fromEntries(Object.entries(r).map(([k, v]) => [k, String(v)])); setFormData(strRec); setEditingId(r.id); setView('input'); window.scrollTo({top: 0, behavior: 'smooth'}); };
+            const cancelEdit = () => { setEditingId(null); setFormData({...INITIAL_FORM, department: departments[0], branchId: branches[0].id}); setView('input'); };
+            const handleDelete = (id) => { if(confirm("¿Borrar?")) setRecords(records.filter(r=>r.id!==id)); };
+            const handleInputChange = (e) => setFormData({...formData, [e.target.name]: e.target.value});
+            const exportData = () => { const dataStr = JSON.stringify({version:"4.0", records, departments, branches, kValue}, null, 2); const blob = new Blob([dataStr], {type: "application/json"}); const url = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = url; link.download = `SST_Data_${new Date().toISOString().slice(0,10)}.json`; link.click(); };
+            const importData = (e) => { const file = e.target.files[0]; if(!file) return; const reader = new FileReader(); reader.onload = (ev) => { try { const d = JSON.parse(ev.target.result); if(d.records) { setRecords(d.records); if(d.departments) setDepartments(d.departments); if(d.branches) setBranches(d.branches); if(d.kValue) setKValue(d.kValue); if(d.records.length) setFilterYear(d.records[0].year); setNotification("Backup restaurado."); } } catch(err) { alert("Error en archivo"); } }; reader.readAsText(file); };
+
+            let content;
+            if (view === 'dashboard' || billboardMode) {
+                // CONDITIONAL RENDER PARA KPIs
+                let kpiSection;
+                const isStandardView = filterType === 'Todos' || filterType === 'Trabajo';
+                const chartTitle1 = isStandardView ? 'TENDENCIA IFN vs IFB' : `TENDENCIA MENSUAL (${filterType.toUpperCase()})`;
+                const chartTitle2 = isStandardView ? 'SEVERIDAD MENSUAL (IS)' : `DÍAS PERDIDOS (${filterType.toUpperCase()})`;
+
+                if (isStandardView) {
+                    kpiSection = (
+                        <div className="grid grid-cols-4 gap-4">
+                            <div className="bg-emerald-50 p-4 rounded-xl border border-emerald-100"><span className="text-xs font-bold text-emerald-600 uppercase">IFN (Neta)</span><div className="text-3xl font-bold text-emerald-700 mt-1">{globalStats.ifn}</div></div>
+                            <div className="bg-sky-50 p-4 rounded-xl border border-sky-100"><span className="text-xs font-bold text-sky-600 uppercase">IFB (Bruta)</span><div className="text-3xl font-bold text-sky-700 mt-1">{globalStats.ifb}</div></div>
+                            <div className="bg-red-50 p-4 rounded-xl border border-red-100"><span className="text-xs font-bold text-red-600 uppercase">IS (Severidad)</span><div className="text-3xl font-bold text-red-700 mt-1">{globalStats.is}</div></div>
+                            <div className="bg-white p-4 rounded-xl border border-slate-200"><span className="text-xs font-bold text-slate-400 uppercase">Eventos</span><div className="grid grid-cols-2 gap-x-4 text-xs mt-1"><div>Trabajo: <b>{globalStats.totalWorkAcc}</b></div><div>Itinere: <b>{globalStats.itinere}</b></div><div>Misión: <b>{globalStats.mission}</b></div><div>Rec.: <b>{globalStats.rec}</b></div></div></div>
+                        </div>
+                    );
+                } else {
+                    kpiSection = (
+                        <div className="grid grid-cols-2 gap-6">
+                            <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+                                <div><span className="text-sm font-bold text-slate-500 uppercase">Total Eventos ({filterType})</span><div className="text-4xl font-bold text-slate-800 mt-2">{globalStats.dynamicCountTotal}</div></div>
+                                <Icons.Activity className="h-12 w-12 text-slate-200"/>
+                            </div>
+                            <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+                                <div><span className="text-sm font-bold text-slate-500 uppercase">Total Días Perdidos ({filterType})</span><div className="text-4xl font-bold text-red-600 mt-2">{globalStats.dynamicDaysTotal}</div></div>
+                                <Icons.Calendar className="h-12 w-12 text-red-100"/>
+                            </div>
+                        </div>
+                    );
+                }
+
+                content = (
+                    <div className="space-y-8">
+                        <div className="flex flex-col md:flex-row justify-between items-center bg-white p-4 rounded-xl shadow-sm border border-slate-200 no-print gap-4">
+                            <h2 className="font-bold text-lg flex gap-2"><Icons.BarChart3 className="h-6 w-6 text-emerald-600"/> Dashboard {filterYear}</h2>
+                            <div className="flex flex-wrap gap-4 items-end">
+                                <div className="flex flex-col">
+                                    <label className="text-xs font-bold text-slate-500 mb-1">Sucursal</label>
+                                    <select value={filterBranch} onChange={e=>setFilterBranch(e.target.value)} className="p-1 border rounded text-sm w-40"><option value="Todos">Todas Sucursales</option>{branches.map(b=><option key={b.id} value={b.id}>{b.name}</option>)}</select>
+                                </div>
+                                <div className="flex flex-col">
+                                    <label className="text-xs font-bold text-slate-500 mb-1">Departamento</label>
+                                    <select value={filterDept} onChange={e=>setFilterDept(e.target.value)} className="p-1 border rounded text-sm w-40"><option value="Todos">Todos Deptos</option>{departments.map(d=><option key={d} value={d}>{d}</option>)}</select>
+                                </div>
+                                <div className="flex flex-col">
+                                    <label className="text-xs font-bold text-slate-500 mb-1">Evento</label>
+                                    <select value={filterType} onChange={e=>setFilterType(e.target.value)} className="p-1 border rounded text-sm font-bold text-emerald-700 bg-emerald-50 w-32">{EVENT_TYPES.map(t=><option key={t} value={t}>{t}</option>)}</select>
+                                </div>
+                                <div className="flex flex-col">
+                                    <label className="text-xs font-bold text-slate-500 mb-1">Año</label>
+                                    <select value={filterYear} onChange={e=>setFilterYear(Number(e.target.value))} className="p-1 border rounded text-sm w-24">
+                                        {YEARS.map(y => <option key={y} value={y}>{y}</option>)}
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        {kpiSection}
+
+                        <div className="grid lg:grid-cols-2 gap-6">
+                            <div id="chart-ifn-container" className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm h-72 relative group">
+                                <div className="flex justify-between mb-2"><h3 className="text-xs font-bold text-slate-500">{chartTitle1}</h3><button onClick={()=>downloadElementAsPng('chart-ifn-container', 'Grafico_Tendencia')} className="text-slate-400 hover:text-blue-500 no-print" title="Descargar PNG"><Icons.Camera className="h-4 w-4"/></button></div>
+                                <div className="h-full pb-6">
+                                    {isStandardView ? 
+                                        <SimpleLineChart data={monthlyStats} dataKey1="ifn" dataKey2="ifb" color1={BRAND_COLOR} color2="#0ea5e9"/> :
+                                        <SimpleLineChart data={monthlyStats} dataKey1="dynamicCount" dataKey2="dynamicCount" color1={BRAND_COLOR} color2={BRAND_COLOR}/>
+                                    }
+                                </div>
+                            </div>
+                            <div id="chart-is-container" className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm h-72 relative group">
+                                <div className="flex justify-between mb-2"><h3 className="text-xs font-bold text-slate-500">{chartTitle2}</h3><button onClick={()=>downloadElementAsPng('chart-is-container', 'Grafico_Severidad')} className="text-slate-400 hover:text-blue-500 no-print" title="Descargar PNG"><Icons.Camera className="h-4 w-4"/></button></div>
+                                <div className="h-full pb-6">
+                                    {isStandardView ?
+                                        <SimpleBarChart data={monthlyStats} dataKey="is" color="#ef4444"/> :
+                                        <SimpleBarChart data={monthlyStats} dataKey="dynamicDays" color="#ef4444"/>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                        <div id="summary-table-container" className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden relative group">
+                            <div className="p-4 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
+                                <h3 className="font-bold text-sm text-slate-700">Resumen Mensual Detallado</h3>
+                                <button onClick={()=>downloadElementAsPng('summary-table-container', 'Tabla_Resumen')} className="text-slate-400 hover:text-blue-500 bg-white p-1 rounded border no-print" title="Descargar PNG"><Icons.Camera className="h-4 w-4"/></button>
+                            </div>
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-xs text-left">
+                                    <thead><tr className="bg-white border-b"><th className="p-3">Mes</th><th className="p-3 text-right">H.H.E.</th><th className="p-3 text-center text-emerald-700">IFN</th><th className="p-3 text-center text-sky-700">IFB</th><th className="p-3 text-center text-red-700">IS</th><th className="p-3 text-center bg-slate-50 font-bold">Acc. Trab.</th><th className="p-3 text-center">Itinere</th><th className="p-3 text-center">Misión</th><th className="p-3 text-center">Rec.</th></tr></thead>
+                                    <tbody>{monthlyStats.map((r,i) => <tr key={i} className="border-b hover:bg-slate-50"><td className="p-3 font-medium">{r.month}</td><td className="p-3 text-right text-slate-500">{Number(r.hours).toLocaleString()}</td><td className="p-3 text-center font-bold text-emerald-600">{r.ifn}</td><td className="p-3 text-center font-bold text-sky-600">{r.ifb}</td><td className="p-3 text-center font-bold text-red-600">{r.is}</td><td className="p-3 text-center bg-slate-50 font-bold text-slate-700">{r.totalWorkAcc}</td><td className="p-3 text-center text-slate-400">{r.itinere_acc}</td><td className="p-3 text-center text-slate-400">{r.mission_acc}</td><td className="p-3 text-center text-slate-400">{r.recreation_acc}</td></tr>)}</tbody>
+                                    <tfoot className="bg-slate-800 text-white font-bold"><tr><td className="p-3">TOTAL</td><td className="p-3 text-right">{globalStats.hours.toLocaleString()}</td><td className="p-3 text-center text-emerald-300">{globalStats.ifn}</td><td className="p-3 text-center text-sky-300">{globalStats.ifb}</td><td className="p-3 text-center text-red-300">{globalStats.is}</td><td className="p-3 text-center bg-slate-700">{globalStats.totalWorkAcc}</td><td className="p-3 text-center bg-slate-700">{globalStats.itinere}</td><td className="p-3 text-center bg-slate-700">{globalStats.mission}</td><td className="p-3 text-center bg-slate-700">{globalStats.rec}</td></tr></tfoot>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                );
+            } else if (view === 'input') {
+                content = (
+                    <SettingsOrInputView view='input' departments={departments} branches={branches} formData={formData} handleInputChange={handleInputChange} handleSubmit={handleSubmit} cancelEdit={cancelEdit} editingId={editingId} records={records} handleEdit={handleEdit} handleDelete={handleDelete} />
+                );
+            } else {
+                content = (
+                    <SettingsOrInputView view='settings' departments={departments} branches={branches} addBranch={addBranch} newBranchName={newBranchName} setNewBranchName={setNewBranchName} newBranchState={newBranchState} setNewBranchState={setNewBranchState} removeBranch={removeBranch} addDept={addDept} newDeptName={newDeptName} setNewDeptName={setNewDeptName} removeDept={removeDept} kValue={kValue} setKValue={setKValue} />
+                );
+            }
+
+            return (
+                <div id="app-container" className={`min-h-screen ${billboardMode?'bg-white':'bg-slate-50'}`}>
+                    {isExporting && <div className="export-loader"><div className="spinner"></div><p className="mt-2 text-slate-600 font-bold">Generando Reporte PDF Completo...</p></div>}
+                    {notification && <div className="fixed top-4 right-4 z-[100] bg-slate-800 text-white px-6 py-3 rounded-lg shadow-xl animate-bounce flex items-center gap-2"><Icons.Check className="h-5 w-5 text-emerald-400"/>{notification}</div>}
+
+                    {/* MODAL DE REINICIO */}
+                    {showResetModal && (
+                        <div className="modal-overlay">
+                            <div className="modal-content animate-in zoom-in-95">
+                                <div className="mb-4 text-red-500 flex justify-center"><Icons.AlertCircle className="h-12 w-12"/></div>
+                                <h3 className="text-lg font-bold text-slate-800 mb-2">¿Estás seguro de reiniciar todo?</h3>
+                                <p className="text-sm text-slate-500 mb-6">Esta acción borrará todos los datos cargados, filtros y configuraciones. No se puede deshacer.</p>
+                                <div className="flex gap-3 justify-center">
+                                    <button onClick={() => setShowResetModal(false)} className="px-4 py-2 border rounded text-slate-600 font-bold hover:bg-slate-50">Cancelar</button>
+                                    <button onClick={confirmReset} className="px-4 py-2 bg-red-500 text-white rounded font-bold hover:bg-red-600">Sí, Reiniciar Todo</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {!billboardMode && <header className="bg-white shadow-sm border-b border-slate-200 sticky top-0 z-50">
+                        <div className="max-w-7xl mx-auto p-3 flex flex-col md:flex-row justify-between items-center gap-4">
+                            <div className="flex items-center gap-4">
+                                <div className="flex flex-col">
+                                    <h1 className="text-2xl font-extrabold text-slate-800 tracking-tight leading-none">Gestion de estadisticas de accidentes</h1>
+                                </div>
+                            </div>
+                            {/* BOTONES CON CLASE NO-PRINT PARA QUE NO SALGAN EN EL PDF */}
+                            <div className="flex flex-col items-end gap-2 no-print">
+                                <div className="flex gap-2">
+                                    {/* Botón Reiniciar ahora abre el modal */}
+                                    <button onClick={handleReset} className="header-btn btn-danger-action" title="Borrar todo"><Icons.RotateCcw className="h-4 w-4"/> Reiniciar</button>
+                                    <button onClick={() => setBillboardMode(true)} className="header-btn btn-action" title="Vista limpia"><Icons.Layout className="h-4 w-4"/> Cartelera</button>
+                                    <button onClick={handleDownloadPDF} className="header-btn btn-primary-action" title="Descargar Reporte"><Icons.Download className="h-4 w-4"/> PDF PRO</button>
+                                    <button onClick={loadSampleData} className="header-btn btn-warn-action" title="Datos Prueba"><Icons.Database className="h-4 w-4"/> Cargar Demo</button><button onClick={() => setView('settings')} className="header-btn btn-action" title="Configuración"><Icons.Settings className="h-4 w-4"/> Config</button><button onClick={exportData} className="header-btn btn-action" title="Guardar JSON"><Icons.Save className="h-4 w-4"/> Backup</button><label className="header-btn btn-action cursor-pointer" title="Cargar JSON"><Icons.Upload className="h-4 w-4"/> Importar <input type="file" className="hidden" onChange={importData}/></label></div>
+                                <div className="flex gap-2"><button onClick={() => { setView('input'); setEditingId(null); setFormData({...INITIAL_FORM, department: departments[0], branchId: branches[0].id}); }} className={`flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold border ${view==='input' ? 'bg-emerald-50 border-emerald-500 text-emerald-700' : 'bg-white text-slate-500'}`}><Icons.Plus className="h-3 w-3"/> Cargar Mes</button><button onClick={() => setView('dashboard')} className={`flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold border ${view==='dashboard' ? 'bg-emerald-50 border-emerald-500 text-emerald-700' : 'bg-white text-slate-500'}`}><Icons.BarChart3 className="h-3 w-3"/> Ver Datos</button></div>
+                            </div>
+                        </div>
+                        <div className="h-1 w-full" style={{ backgroundColor: BRAND_COLOR }}></div>
+                    </header>}
+
+                    {billboardMode && <div className="p-6 bg-white border-b flex justify-between items-center print:hidden no-print">
+                        <h1 className="text-2xl font-bold text-slate-800">Modo Cartelera</h1>
+                        <div className="flex gap-2">
+                            <button onClick={handleDownloadPDF} className="bg-slate-800 text-white px-4 py-2 rounded flex gap-2 items-center hover:bg-slate-700 transition-colors">
+                                <Icons.Download className="h-4 w-4"/> Descargar PDF
+                            </button>
+                            <button onClick={() => setBillboardMode(false)} className="text-red-500 font-bold underline px-4 py-2">
+                                Salir
+                            </button>
+                        </div>
+                    </div>}
+
+                    <main id="dashboard-content" className={`mx-auto ${billboardMode?'p-8 bg-white max-w-none':'p-6 max-w-7xl'}`}>
+                         {/* Se eliminó la clase 'no-print' para que este encabezado salga en el PDF y se agregó el año */}
+                         <div className="text-center py-6 mb-4">
+                            <h1 className="text-3xl md:text-4xl font-extrabold uppercase tracking-tight text-slate-800 mb-2">
+                                La Movida de SST DAO Network
+                            </h1>
+                            <h2 className="text-xl md:text-2xl font-bold uppercase tracking-tight" style={{ color: NEUTRAL_COLOR }}>
+                                Estadísticas de Accidentes <span style={{ color: BRAND_COLOR }}>Norma COVENIN 474</span> - {filterYear}
+                            </h2>
+                            <div className="mt-4 text-xs md:text-sm text-slate-500 flex flex-col md:flex-row justify-center items-center gap-2 md:gap-6 border-t border-slate-200 pt-4 mx-auto max-w-4xl">
+                               <span><Icons.User className="inline h-3 w-3 mr-1"/>Elaborado por: David Linares Brea</span>
+                               <span><Icons.Globe className="inline h-3 w-3 mr-1"/>www.movidasst.com</span>
+                               <span><Icons.Mail className="inline h-3 w-3 mr-1"/>movidasst@gmail.com</span>
+                               <span><Icons.Phone className="inline h-3 w-3 mr-1"/>+56 9 6861 5650</span>
+                            </div>
+                        </div>
+                         {content}
+                    </main>
+                </div>
+            );
+        }
+
+        const SettingsOrInputView = ({ view, departments, branches, formData, handleInputChange, handleSubmit, cancelEdit, editingId, addBranch, newBranchName, setNewBranchName, newBranchState, setNewBranchState, removeBranch, addDept, newDeptName, setNewDeptName, removeDept, kValue, setKValue, records, handleEdit, handleDelete }) => {
+            if (view === 'settings') return (
+                <div className="max-w-4xl mx-auto animate-in fade-in space-y-6 no-print">
+                    <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6"><div className="flex gap-4"><label className="font-bold text-sm">Constante K</label><div className="flex gap-2"><button onClick={()=>setKValue(1000000)} className={`p-2 border rounded ${kValue===1000000?'bg-emerald-50 border-emerald-500 text-emerald-700':''}`}>1.000.000 (COVENIN)</button><button onClick={()=>setKValue(200000)} className={`p-2 border rounded ${kValue===200000?'bg-blue-50 border-blue-500 text-blue-700':''}`}>200.000 (OSHA)</button></div></div></div>
+                    <div className="grid md:grid-cols-2 gap-6">
+                        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4"><h3 className="font-bold mb-4">Sucursales</h3><form onSubmit={addBranch} className="flex gap-2 mb-4"><input value={newBranchName} onChange={e=>setNewBranchName(e.target.value)} className="input-field flex-1" placeholder="Nombre..." /><select value={newBranchState} onChange={e=>setNewBranchState(e.target.value)} className="input-field flex-1">{VENEZUELA_STATES.map(s=><option key={s} value={s}>{s}</option>)}</select><button className="btn-primary-action header-btn">+</button></form><div className="max-h-60 overflow-y-auto space-y-2">{branches.map(b=><div key={b.id} className="flex justify-between p-2 bg-slate-50 rounded border border-slate-100 text-sm"><span>{b.name} ({b.state})</span><button onClick={()=>removeBranch(b.id)} className="text-red-400"><Icons.Trash2 className="h-4 w-4"/></button></div>)}</div></div>
+                        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4"><h3 className="font-bold mb-4">Departamentos</h3><form onSubmit={addDept} className="flex gap-2 mb-4"><input value={newDeptName} onChange={e=>setNewDeptName(e.target.value)} className="input-field flex-1" placeholder="Nombre..." /><button className="btn-primary-action header-btn">+</button></form><div className="max-h-60 overflow-y-auto space-y-2">{departments.map(d=><div key={d} className="flex justify-between p-2 bg-slate-50 rounded border border-slate-100 text-sm"><span>{d}</span><button onClick={()=>removeDept(d)} className="text-red-400"><Icons.Trash2 className="h-4 w-4"/></button></div>)}</div></div>
+                    </div>
+                </div>
+            );
+            if (view === 'input') return (
+                <div className="animate-in fade-in no-print">
+                    <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden mb-8">
+                        <div className="p-4 flex items-center justify-between border-b border-slate-100 bg-slate-50">
+                            <h2 className="font-bold flex items-center gap-2 text-lg" style={{ color: NEUTRAL_COLOR }}>{editingId ? <><Icons.Edit2 className="h-5 w-5 text-amber-500" /> Editando</> : <><Icons.FileText className="h-5 w-5" style={{ color: BRAND_COLOR }} /> Nuevo Registro</>}</h2>
+                            {editingId && <button onClick={cancelEdit} className="text-xs bg-slate-200 px-3 py-1 rounded">Cancelar</button>}
+                        </div>
+                        <form onSubmit={handleSubmit} className="p-6 space-y-8">
+                            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                                <div><label className="label-text">Sucursal</label><select name="branchId" value={formData.branchId} onChange={handleInputChange} className="input-field">{branches.map(b=><option key={b.id} value={b.id}>{b.name}</option>)}</select></div>
+                                <div><label className="label-text">Depto</label><select name="department" value={formData.department} onChange={handleInputChange} className="input-field">{departments.map(d=><option key={d} value={d}>{d}</option>)}</select></div>
+                                <div className="grid grid-cols-2 gap-2"><div><label className="label-text">Mes</label><select name="month" value={formData.month} onChange={handleInputChange} className="input-field">{MONTHS.map(m=><option key={m} value={m}>{m}</option>)}</select></div><div><label className="label-text">Año</label><input type="number" name="year" value={formData.year} onChange={handleInputChange} className="input-field"/></div></div>
+                                <div className="grid grid-cols-2 gap-2"><div><label className="label-text">H.H.E.</label><input type="number" name="hours" value={formData.hours} onChange={handleInputChange} className="input-field"/></div><div><label className="label-text">Trab.</label><input type="number" name="workers" value={formData.workers} onChange={handleInputChange} className="input-field"/></div></div>
+                            </div>
+                            <hr className="border-slate-100"/>
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                <div><label className="label-text text-emerald-800">Con Baja</label><input type="number" name="work_accLostTime" value={formData.work_accLostTime} onChange={handleInputChange} className="input-field border-emerald-200"/></div>
+                                <div><label className="label-text text-emerald-800">Sin Baja</label><input type="number" name="work_accNoLostTime" value={formData.work_accNoLostTime} onChange={handleInputChange} className="input-field border-emerald-200"/></div>
+                                <div><label className="label-text text-emerald-800">Días Perd.</label><input type="number" name="work_daysLost" value={formData.work_daysLost} onChange={handleInputChange} className="input-field border-emerald-200"/></div>
+                                <div><label className="label-text text-emerald-800">Días Carg.</label><input type="number" name="work_daysCharged" value={formData.work_daysCharged} onChange={handleInputChange} className="input-field border-emerald-200"/></div>
+                            </div>
+                            <div className="grid grid-cols-3 gap-4">
+                                <CategoryCard icon={Icons.Truck} title="In Itinere" accName="itinere_acc" daysLostName="itinere_daysLost" daysChargedName="itinere_daysCharged" formData={formData} onChange={handleInputChange}/>
+                                <CategoryCard icon={Icons.Plane} title="En Misión" accName="mission_acc" daysLostName="mission_daysLost" daysChargedName="mission_daysCharged" formData={formData} onChange={handleInputChange}/>
+                                <CategoryCard icon={Icons.PartyPopper} title="Recreativos" accName="recreation_acc" daysLostName="recreation_daysLost" daysChargedName="recreation_daysCharged" formData={formData} onChange={handleInputChange}/>
+                            </div>
+                            <div className="flex justify-end gap-2"><button type="submit" className="btn-primary-action header-btn px-4 py-2 rounded text-sm">Guardar</button></div>
+                        </form>
+                    </div>
+                    <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                        <div className="p-4 border-b border-slate-100 bg-slate-50 font-bold text-sm">Registros Existentes</div>
+                        <div className="overflow-x-auto max-h-60">
+                            <table className="w-full text-xs text-left"><thead className="bg-slate-50"><tr><th className="p-2">Fecha</th><th className="p-2">Ubicación</th><th className="p-2">Acc.</th><th className="p-2">Acciones</th></tr></thead><tbody>{records.slice().reverse().map(r=><tr key={r.id} className="border-t"><td className="p-2">{r.month} {r.year}</td><td className="p-2">{r.department}</td><td className="p-2">{Number(r.work_accLostTime)+Number(r.work_accNoLostTime)}</td><td className="p-2 flex gap-2"><button onClick={()=>handleEdit(r)} className="text-blue-500"><Icons.Edit2 className="h-3 w-3"/></button><button onClick={()=>handleDelete(r.id)} className="text-red-500"><Icons.Trash2 className="h-3 w-3"/></button></td></tr>)}</tbody></table>
+                        </div>
+                    </div>
+                </div>
+            );
+            return null;
+        };
+
+        const CategoryCard = ({ icon: Icon, title, accName, daysLostName, daysChargedName, formData, onChange }) => (
+            <div className="bg-white p-4 rounded border border-slate-200">
+                <div className="flex items-center gap-2 mb-2 text-xs font-bold uppercase text-slate-500">
+                    <Icon className="h-4 w-4"/>{title}
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                    <div>
+                        <label className="text-[10px]">Eventos</label>
+                        <input type="number" name={accName} value={formData[accName]} onChange={onChange} className="input-field h-8" />
+                    </div>
+                    <div>
+                        <label className="text-[10px]">D. Perd.</label>
+                        <input type="number" name={daysLostName} value={formData[daysLostName]} onChange={onChange} className="input-field h-8" />
+                    </div>
+                    <div>
+                        <label className="text-[10px]">D. Carg.</label>
+                        <input type="number" name={daysChargedName} value={formData[daysChargedName]} onChange={onChange} className="input-field h-8" />
+                    </div>
+                </div>
+            </div>
+        );
+        
+        const SimpleLineChart = ({ data, dataKey1, dataKey2, color1, color2 }) => { 
+           if(!data.length) return null; 
+           const width = 1200;
+           const height = 400;
+           const padding = 40;
+           const vals = data.flatMap(d => [Number(d[dataKey1])||0, Number(d[dataKey2])||0]); 
+           const max = Math.max(...vals, 1) * 1.2;
+           const getPoints = k => data.map((d, i) => { const x = padding + (i / (data.length - 1 || 1)) * (width - 2 * padding); const val = Number(d[k]) || 0; const y = (height - padding) - (val / max) * (height - 2 * padding); return {x, y, val: Number(d[k])||0}; });
+           const l1 = getPoints(dataKey1); const l2 = getPoints(dataKey2);
+           const path1 = l1.map(pt => `${pt.x},${pt.y}`).join(' '); const path2 = l2.map(pt => `${pt.x},${pt.y}`).join(' ');
+           
+           return (<svg id="chart-line-svg" viewBox={`0 0 ${width} ${height}`} className="w-full h-full" width="100%" height="100%"><rect width={width} height={height} fill="white" />{[0,0.25,0.5,0.75,1].map(k=><line key={k} x1={padding} y1={height-(height*k)-padding} x2={width-padding} y2={height-(height*k)-padding} stroke="#f1f5f9" strokeWidth="2"/>)}<polyline points={path1} fill="none" stroke={color1} strokeWidth="5" strokeLinecap="round"/><polyline points={path2} fill="none" stroke={color2} strokeWidth="3" strokeDasharray="15,10"/>{l1.map((pt,i)=><g key={i}><circle cx={pt.x} cy={pt.y} r="8" fill="white" stroke={color1} strokeWidth="4"/><rect x={pt.x-20} y={pt.y-45} width="40" height="25" rx="5" fill="white" fillOpacity="0.8"/><text x={pt.x} y={pt.y-25} fontSize="22" fontWeight="bold" fill={color1} textAnchor="middle">{pt.val>0?pt.val:''}</text></g>)}{data.map((d,i)=>{const x = padding + (i/(data.length-1||1))*(width-2*padding); return <text key={i} x={x} y={height - 10} fontSize="16" fill="#64748b" textAnchor="middle">{d.month.substring(0,3).toUpperCase()}</text>})}</svg>);
+        };
+
+        const SimpleBarChart = ({ data, dataKey, color }) => { 
+           if(!data.length) return null; 
+           const width = 1200;
+           const height = 400;
+           const padding = 40;
+           const vals = data.map(d=>Number(d[dataKey])||0); const max=Math.max(...vals,1)*1.2;
+           return (<svg id="chart-bar-svg" viewBox={`0 0 ${width} ${height}`} className="w-full h-full" width="100%" height="100%"><rect width={width} height={height} fill="white" />{[0,0.5,1].map(k=><line key={k} x1={padding} y1={height-padding-(height-2*padding)*k} x2={width-padding} y2={height-padding-(height-2*padding)*k} stroke="#f1f5f9" strokeWidth="2"/>)}{data.map((d,i)=>{
+               const val = Number(d[dataKey])||0;
+               const bh = (val/max)*(height-2*padding);
+               const bw = ((width-2*padding)/data.length)*0.6;
+               const x = padding + (i * ((width-2*padding)/data.length)) + (((width-2*padding)/data.length)-bw)/2;
+               const y = height - padding - bh;
+               let fill = val>500 ? '#ef4444' : (val>100 ? '#f59e0b' : '#22c55e');
+               return <g key={i}><rect x={x} y={y} width={bw} height={bh} fill={fill} rx="4"/>{val>0 && <text x={x+bw/2} y={y-10} fontSize="20" fontWeight="bold" fill="#334155" textAnchor="middle">{val}</text>}<text x={x+bw/2} y={height - 10} fontSize="16" fill="#64748b" textAnchor="middle">{d.month.substring(0,3).toUpperCase()}</text></g>
+           })}</svg>);
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
