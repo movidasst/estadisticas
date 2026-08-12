@@ -3,20 +3,23 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Estadísticas de Accidentalidad - La Movida de SST</title>
+    <meta name="theme-color" content="#0B2A6F">
+    <meta name="description" content="Gestión de estadísticas de lesiones de trabajo basada en NVC 474:1997 y NTF 474:2014. La Movida de SST.">
+    <title>Estadísticas de Lesiones de Trabajo | La Movida de SST · V4</title>
     
     <!-- METADATOS REDES SOCIALES -->
-    <meta property="og:title" content="Estadísticas de Accidentalidad - La Movida de SST">
-    <meta property="og:description" content="Dashboard de Gestión SST bajo Norma COVENIN 474.">
+    <meta property="og:title" content="Estadísticas de Lesiones de Trabajo | La Movida de SST">
+    <meta property="og:description" content="Herramienta para registro y análisis estadístico basada en NVC 474:1997 y NTF 474:2014.">
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://www.movidasst.com">
-    <meta property="og:image" content="https://assets.poap.xyz/ae80dd44-a4b8-4a90-9d76-2da198a1f6fc.png">
+    <meta property="og:image" content="https://drive.google.com/thumbnail?id=1MjVa3JxeKC95xEdlcZ5ZFMCKlatbrU2s&sz=w700">
     
     <!-- REACT & LIBRERIAS -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
@@ -25,40 +28,169 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     
     <style>
-        body { background-color: #f8fafc; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-        .input-field { width: 100%; padding: 0.5rem; border: 1px solid #cbd5e1; border-radius: 0.375rem; font-size: 0.875rem; transition: all 0.2s; }
-        .input-field:focus { border-color: #00b050; outline: none; box-shadow: 0 0 0 3px rgba(0, 176, 80, 0.2); }
-        .label-text { display: block; font-size: 0.75rem; font-weight: 700; color: #475569; margin-bottom: 0.25rem; text-transform: uppercase; }
-        .header-btn { display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 0.75rem; border-radius: 0.375rem; font-size: 0.75rem; font-weight: 600; transition: all 0.2s; cursor: pointer; white-space: nowrap; }
-        .btn-action { background-color: #ffffff; color: #475569; border: 1px solid #e2e8f0; }
-        .btn-action:hover { background-color: #f8fafc; color: #1e293b; border-color: #cbd5e1; }
-        .btn-primary-action { background-color: #00b050; color: white; border: 1px solid #00b050; }
-        .btn-primary-action:hover { background-color: #008a3e; }
-        .btn-danger-action { color: #ef4444; background-color: #fff; border: 1px solid #fecaca; }
-        .btn-danger-action:hover { background-color: #fef2f2; color: #dc2626; }
-        .btn-help-action { color: #6366f1; background-color: #e0e7ff; border: 1px solid #c7d2fe; }
-        .btn-help-action:hover { background-color: #c7d2fe; color: #4338ca; }
-        .btn-warn-action { color: #d97706; background-color: #fff; border: 1px solid #fde68a; }
-        .btn-warn-action:hover { background-color: #fffbeb; color: #b45309; }
-        
-        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.5); z-index: 10000; display: flex; justify-content: center; align-items: center; }
-        .modal-content { background: white; padding: 2rem; border-radius: 0.75rem; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1); max-width: 500px; width: 90%; text-align: left; max-height: 90vh; overflow-y: auto; }
-        .help-step { display: flex; gap: 1rem; margin-bottom: 1.5rem; }
-        .help-number { background-color: #00b050; color: white; width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; flex-shrink: 0; font-size: 0.75rem; margin-top: 2px; }
+        :root {
+            --movida-blue: #0B2A6F;
+            --movida-petrol: #006D8F;
+            --movida-green: #58B947;
+            --movida-turquoise: #00CFC0;
+            --ink: #172033;
+            --muted: #64748b;
+            --surface: #ffffff;
+            --surface-soft: #f6f8fb;
+            --border: #dbe3ee;
+        }
+        * { box-sizing: border-box; }
+        html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; }
+        body {
+            margin: 0;
+            background: var(--surface-soft);
+            color: var(--ink);
+            font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            line-height: 1.45;
+        }
+        button, input, select, label { font: inherit; }
+        button, [role="button"], select, input { min-height: 44px; }
+        button:focus-visible, input:focus-visible, select:focus-visible, label:focus-within {
+            outline: 3px solid rgba(0, 109, 143, .22);
+            outline-offset: 2px;
+        }
+        .input-field {
+            width: 100%;
+            min-height: 44px;
+            padding: .65rem .75rem;
+            border: 1px solid #cbd5e1;
+            border-radius: .65rem;
+            background: #fff;
+            color: #1e293b;
+            font-size: .925rem;
+            transition: border-color .18s ease, box-shadow .18s ease, background .18s ease;
+        }
+        .input-field:focus { border-color: var(--movida-petrol); outline: none; box-shadow: 0 0 0 3px rgba(0,109,143,.14); }
+        .label-text { display: block; font-size: .75rem; font-weight: 800; color: #475569; margin-bottom: .35rem; text-transform: uppercase; letter-spacing: .03em; }
+        .header-btn {
+            display: inline-flex;
+            min-height: 42px;
+            align-items: center;
+            justify-content: center;
+            gap: .45rem;
+            padding: .55rem .72rem;
+            border-radius: .7rem;
+            font-size: .78rem;
+            font-weight: 750;
+            transition: transform .16s ease, background .16s ease, border-color .16s ease;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+        .header-btn:active { transform: translateY(1px); }
+        .btn-action { background: #fff; color: #475569; border: 1px solid #dbe3ee; }
+        .btn-action:hover { background: #f8fafc; color: #172033; border-color: #bcc8d8; }
+        .btn-primary-action { background: var(--movida-blue); color: #fff; border: 1px solid var(--movida-blue); }
+        .btn-primary-action:hover { background: #081f53; }
+        .btn-danger-action { color: #b42318; background: #fff; border: 1px solid #fecaca; }
+        .btn-danger-action:hover { background: #fff1f2; }
+        .btn-help-action { color: #075985; background: #f0f9ff; border: 1px solid #bae6fd; }
+        .btn-help-action:hover { background: #e0f2fe; }
+        .btn-warn-action { color: #9a6700; background: #fffdf5; border: 1px solid #fde68a; }
+        .btn-warn-action:hover { background: #fffbeb; }
+        .brand-bar {
+            background: linear-gradient(90deg, #F4D000 0 33.333%, #00247D 33.333% 66.666%, #CF142B 66.666% 100%);
+            height: 4px;
+            width: 100%;
+        }
+        .brand-logo {
+            width: 58px;
+            height: 58px;
+            object-fit: contain;
+            flex: 0 0 auto;
+        }
+        .mobile-scroll {
+            display: flex;
+            width: 100%;
+            gap: .5rem;
+            overflow-x: auto;
+            overscroll-behavior-inline: contain;
+            scrollbar-width: none;
+            padding-bottom: .15rem;
+        }
+        .mobile-scroll::-webkit-scrollbar { display: none; }
+        .modal-overlay { position: fixed; inset: 0; padding: 1rem; background: rgba(11, 42, 111, .34); backdrop-filter: blur(3px); z-index: 10000; display: flex; justify-content: center; align-items: center; }
+        .modal-content { background: #fff; padding: 1.25rem; border-radius: 1rem; box-shadow: 0 24px 70px rgba(15,23,42,.2); max-width: 560px; width: min(100%, 560px); text-align: left; max-height: 92vh; overflow-y: auto; }
+        .help-step { display: flex; gap: .85rem; margin-bottom: 1.2rem; }
+        .help-number { background: var(--movida-blue); color: white; width: 28px; height: 28px; border-radius: 999px; display: flex; align-items: center; justify-content: center; font-weight: 800; flex-shrink: 0; font-size: .78rem; margin-top: 1px; }
+        .technical-note { border-left: 4px solid var(--movida-petrol); background: #f0f9ff; }
+        .metric-card { min-width: 0; }
+        .metric-value { font-variant-numeric: tabular-nums; }
+        .desktop-table { display: none; }
+        .mobile-records { display: grid; gap: .75rem; }
+        .export-loader { position: fixed; inset: 0; z-index: 20000; display:flex; flex-direction:column; align-items:center; justify-content:center; background:rgba(255,255,255,.92); }
+        .spinner { width:42px; height:42px; border:4px solid #dbe3ee; border-top-color:var(--movida-blue); border-radius:50%; animation:spin .8s linear infinite; }
+        .access-screen {
+            min-height: 100vh;
+            display: grid;
+            place-items: center;
+            padding: 1rem;
+            background:
+                radial-gradient(circle at 15% 15%, rgba(0,109,143,.12), transparent 28rem),
+                radial-gradient(circle at 90% 85%, rgba(88,185,71,.10), transparent 26rem),
+                #f6f8fb;
+        }
+        .access-card {
+            width: min(100%, 460px);
+            background: rgba(255,255,255,.98);
+            border: 1px solid #dbe3ee;
+            border-radius: 1.35rem;
+            box-shadow: 0 26px 80px rgba(11,42,111,.14);
+            overflow: hidden;
+        }
+        .storage-warning {
+            background: #fff9e8;
+            border: 1px solid #f4d48a;
+            color: #6b4d00;
+        }
+        @keyframes spin { to { transform:rotate(360deg); } }
 
-        @media print { .no-print { display: none !important; } body { background: white; } .shadow-sm { box-shadow: none !important; } .border { border: 1px solid #ddd !important; } }
+        @media (min-width: 768px) {
+            .brand-logo { width: 68px; height: 68px; }
+            .modal-content { padding: 1.75rem; }
+            .desktop-table { display: block; }
+            .mobile-records { display: none; }
+        }
+        @media print {
+            .no-print { display: none !important; }
+            body { background: white; }
+            .shadow-sm { box-shadow: none !important; }
+            .border { border: 1px solid #ddd !important; }
+            .desktop-table { display: block !important; }
+            .mobile-records { display: none !important; }
+        }
     </style>
 </head>
 <body>
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useMemo, useRef, useEffect } = React;
+        const { useState, useMemo, useEffect } = React;
         const { jsPDF } = window.jspdf;
 
         // --- CONSTANTES ---
-        const BRAND_COLOR = '#00b050'; 
+        const BRAND_COLOR = '#0B2A6F';
+        const ACCENT_COLOR = '#006D8F';
+        const SUCCESS_COLOR = '#58B947';
         const NEUTRAL_COLOR = '#334155';
+        const OFFICIAL_LOGO = 'https://drive.google.com/thumbnail?id=1MjVa3JxeKC95xEdlcZ5ZFMCKlatbrU2s&sz=w700';
+        const SUPABASE_URL = 'https://lfdmbkzghnwvsapxypvt.supabase.co';
+        const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_bRnkA6PA8-v073nrw9zxiQ_8rVGiOn1';
+        const supabaseClient = window.supabase?.createClient(
+            SUPABASE_URL,
+            SUPABASE_PUBLISHABLE_KEY,
+            { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } }
+        ) || null;
+        const ACCESS_SESSION_KEY = 'movidaSST.estadisticas.access.v1';
+        const DEFAULT_K = 1000000;
+        const K_OPTIONS = [
+            { value: 1000000, label: 'OIT', description: 'Base por 1.000.000 de horas trabajadas' },
+            { value: 200000, label: 'OSHA', description: 'Base por 200.000 horas trabajadas' }
+        ];
         const MONTHS = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
         const VENEZUELA_STATES = ['Amazonas', 'Anzoátegui', 'Apure', 'Aragua', 'Barinas', 'Bolívar', 'Carabobo', 'Cojedes', 'Delta Amacuro', 'Distrito Capital', 'Falcón', 'Guárico', 'La Guaira', 'Lara', 'Mérida', 'Miranda', 'Monagas', 'Nueva Esparta', 'Portuguesa', 'Sucre', 'Táchira', 'Trujillo', 'Yaracuy', 'Zulia', 'Dependencias Federales'];
         const INITIAL_DEPARTMENTS = ['Producción', 'Mantenimiento', 'Logística', 'Administración', 'Ventas', 'Seguridad', 'Obras'];
@@ -67,24 +199,32 @@
         // ESTADO INICIAL FORMULARIO
         const INITIAL_FORM = { 
             month: 'Enero', year: new Date().getFullYear(), department: '', branchId: '', 
-            hours: '', workers: '', 
-            work_acc: '0', work_daysLost: '0', work_daysCharged: '0', 
-            itinere_acc: '0', itinere_daysLost: '0', itinere_daysCharged: '0', 
-            mission_acc: '0', mission_daysLost: '0', mission_daysCharged: '0', 
-            recreation_acc: '0', recreation_daysLost: '0', recreation_daysCharged: '0' 
+            hours: '', travel_hours: '', workers: '', 
+            work_accidents: '0', work_acc: '0', work_lostTimeAcc: '0', work_daysLost: '0', work_daysCharged: '0', 
+            itinere_accidents: '0', itinere_acc: '0', itinere_lostTimeAcc: '0', itinere_daysLost: '0', itinere_daysCharged: '0', 
+            mission_acc: '0', mission_lostTimeAcc: '0', mission_daysLost: '0', mission_daysCharged: '0', 
+            recreation_acc: '0', recreation_lostTimeAcc: '0', recreation_daysLost: '0', recreation_daysCharged: '0' 
         };
 
         const FIELD_LABELS = {
             id: "ID Interno", month: "Mes", year: "Año", department: "Departamento", branchId: "ID Sucursal",
-            hours: "Horas Hombre", workers: "Nro Trabajadores",
-            work_acc: "Acc. Trabajo (Eventos)", work_daysLost: "Acc. Trabajo (Días Perdidos)", work_daysCharged: "Acc. Trabajo (Días Cargados)",
-            itinere_acc: "In Itinere (Eventos)", itinere_daysLost: "In Itinere (Días Perdidos)", itinere_daysCharged: "In Itinere (Días Cargados)",
-            mission_acc: "En Misión (Eventos)", mission_daysLost: "En Misión (Días Perdidos)", mission_daysCharged: "En Misión (Días Cargados)",
-            recreation_acc: "Recreativos (Eventos)", recreation_daysLost: "Recreativos (Días Perdidos)", recreation_daysCharged: "Recreativos (Días Cargados)"
+            hours: "HHE - Horas Hombre de Exposición", travel_hours: "HHT - Horas Hombre de Trayecto", workers: "Nro Trabajadores",
+            work_accidents: "Trabajo - Número de Accidentes (IA)", work_acc: "Trabajo - Lesiones Totales (NLT)", work_lostTimeAcc: "Trabajo - Lesiones con Tiempo Perdido (NLPT)", work_daysLost: "Trabajo - Días Perdidos (TDP)", work_daysCharged: "Trabajo - Días Cargados Adicionales",
+            itinere_accidents: "In Itinere - Número de Accidentes (IA)", itinere_acc: "In Itinere - Lesiones Totales (NLT)", itinere_lostTimeAcc: "In Itinere - Lesiones con Tiempo Perdido (NLPT)", itinere_daysLost: "In Itinere - Días Perdidos (TDP)", itinere_daysCharged: "In Itinere - Días Cargados Adicionales",
+            mission_acc: "En Misión (Eventos)", mission_lostTimeAcc: "En Misión (con tiempo perdido)", mission_daysLost: "En Misión (Días Perdidos)", mission_daysCharged: "En Misión (Días Cargados)",
+            recreation_acc: "Recreativos (Eventos)", recreation_lostTimeAcc: "Recreativos (con tiempo perdido)", recreation_daysLost: "Recreativos (Días Perdidos)", recreation_daysCharged: "Recreativos (Días Cargados)"
         };
 
         const LABELS_TO_FIELDS = Object.fromEntries(Object.entries(FIELD_LABELS).map(([key, label]) => [label, key]));
-        const EVENT_TYPES = ['Todos', 'Trabajo', 'Itinere', 'Misión', 'Recreativo'];
+        // Compatibilidad con respaldos generados por la versión anterior.
+        const LEGACY_LABELS_TO_FIELDS = {
+            'Horas Hombre': 'hours', 'Nro Trabajadores': 'workers',
+            'Acc. Trabajo (Eventos)': 'work_accidents', 'Acc. Trabajo (Días Perdidos)': 'work_daysLost', 'Acc. Trabajo (Días Cargados)': 'work_daysCharged',
+            'In Itinere (Eventos)': 'itinere_accidents', 'In Itinere (Días Perdidos)': 'itinere_daysLost', 'In Itinere (Días Cargados)': 'itinere_daysCharged',
+            'En Misión (Eventos)': 'mission_acc', 'En Misión (Días Perdidos)': 'mission_daysLost', 'En Misión (Días Cargados)': 'mission_daysCharged',
+            'Recreativos (Eventos)': 'recreation_acc', 'Recreativos (Días Perdidos)': 'recreation_daysLost', 'Recreativos (Días Cargados)': 'recreation_daysCharged'
+        };
+        const EVENT_TYPES = ['Trabajo', 'Itinere', 'Combinado'];
         const YEARS = Array.from({length: 21}, (_, i) => 2020 + i); 
 
         // --- COMPONENTES ICONOS ---
@@ -156,12 +296,49 @@
             } catch (err) { console.error("Error PNG:", err); alert("Error al exportar imagen."); }
         };
 
+        // --- PERSISTENCIA LOCAL TEMPORAL ---
+        // Se sustituirá por Supabase en la etapa de acceso y base de datos.
+        const STORAGE_KEYS = {
+            records: 'movidaSST.ntf474.records.v3',
+            departments: 'movidaSST.ntf474.departments.v3',
+            branches: 'movidaSST.ntf474.branches.v3',
+            kValue: 'movidaSST.ntf474.kValue.v3'
+        };
+        const readStorage = (key, fallback) => {
+            try {
+                const raw = localStorage.getItem(key);
+                return raw === null ? fallback : JSON.parse(raw);
+            } catch (error) {
+                console.warn('No se pudo leer almacenamiento local:', key, error);
+                return fallback;
+            }
+        };
+        const writeStorage = (key, value) => {
+            try { localStorage.setItem(key, JSON.stringify(value)); }
+            catch (error) { console.warn('No se pudo guardar almacenamiento local:', key, error); }
+        };
+
         // --- COMPONENTE PRINCIPAL ---
         function App() {
-            const [records, setRecords] = useState([]);
-            const [departments, setDepartments] = useState(INITIAL_DEPARTMENTS);
-            const [branches, setBranches] = useState(INITIAL_BRANCHES);
-            const [kValue, setKValue] = useState(1000000);
+            const [accessUser, setAccessUser] = useState(() => {
+                try {
+                    const raw = sessionStorage.getItem(ACCESS_SESSION_KEY);
+                    return raw ? JSON.parse(raw) : null;
+                } catch (error) {
+                    return null;
+                }
+            });
+            const [loginCedula, setLoginCedula] = useState('');
+            const [loginCodigo, setLoginCodigo] = useState('');
+            const [loginLoading, setLoginLoading] = useState(false);
+            const [loginError, setLoginError] = useState('');
+            const [records, setRecords] = useState(() => readStorage(STORAGE_KEYS.records, []));
+            const [departments, setDepartments] = useState(() => readStorage(STORAGE_KEYS.departments, INITIAL_DEPARTMENTS));
+            const [branches, setBranches] = useState(() => readStorage(STORAGE_KEYS.branches, INITIAL_BRANCHES));
+            const [kValue, setKValue] = useState(() => {
+                const stored = Number(readStorage(STORAGE_KEYS.kValue, DEFAULT_K));
+                return K_OPTIONS.some(option => option.value === stored) ? stored : DEFAULT_K;
+            });
             const [view, setView] = useState('dashboard');
             const [formData, setFormData] = useState({...INITIAL_FORM, department: 'Producción', branchId: 'b1'});
             const [editingId, setEditingId] = useState(null);
@@ -181,8 +358,6 @@
             const [newBranchName, setNewBranchName] = useState('');
             const [newBranchState, setNewBranchState] = useState(VENEZUELA_STATES[9]);
 
-            const fileInputRef = useRef(null);
-
             useEffect(() => {
                 if (departments.length > 0 && (!formData.department || !departments.includes(formData.department))) {
                     setFormData(prev => ({ ...prev, department: departments[0] }));
@@ -199,7 +374,80 @@
                 }
             }, [notification]);
 
-            // CÁLCULOS
+            // Persistencia provisional mientras no esté conectado Supabase.
+            useEffect(() => writeStorage(STORAGE_KEYS.records, records), [records]);
+            useEffect(() => writeStorage(STORAGE_KEYS.departments, departments), [departments]);
+            useEffect(() => writeStorage(STORAGE_KEYS.branches, branches), [branches]);
+            useEffect(() => writeStorage(STORAGE_KEYS.kValue, kValue), [kValue]);
+
+            const handleLogin = async (event) => {
+                event.preventDefault();
+                setLoginError('');
+
+                const cedula = String(loginCedula || '').replace(/\D/g, '');
+                const codigo = String(loginCodigo || '').trim().toUpperCase();
+
+                if (!/^[0-9]{5,12}$/.test(cedula)) {
+                    setLoginError('Ingrese una cédula válida.');
+                    return;
+                }
+                if (!/^[A-Z0-9]{5}$/.test(codigo)) {
+                    setLoginError('El código de integrante debe tener exactamente 5 letras o números.');
+                    return;
+                }
+                if (!supabaseClient) {
+                    setLoginError('No se pudo iniciar la conexión con Supabase. Verifique su conexión a internet e intente de nuevo.');
+                    return;
+                }
+
+                setLoginLoading(true);
+                try {
+                    const { data, error } = await supabaseClient.rpc('acceso_integrante', {
+                        p_cedula: cedula,
+                        p_codigo: codigo
+                    });
+                    if (error) throw error;
+
+                    let row = null;
+                    if (Array.isArray(data) && data.length === 1) {
+                        row = data[0];
+                    } else if (data && data.ok === true && data.member) {
+                        row = data.member;
+                    }
+
+                    if (!row) {
+                        setLoginError('Cédula o código de registro incorrectos. Verifique los datos e intente nuevamente.');
+                        return;
+                    }
+
+                    const safeUser = {
+                        cedula,
+                        nombres: String(row.nombres || '').trim(),
+                        apellidos: String(row.apellidos || '').trim()
+                    };
+                    sessionStorage.setItem(ACCESS_SESSION_KEY, JSON.stringify(safeUser));
+                    setAccessUser(safeUser);
+                    setLoginCodigo('');
+                } catch (error) {
+                    console.error('Error validando acceso:', error);
+                    setLoginError('No fue posible validar el acceso en este momento. Intente nuevamente.');
+                } finally {
+                    setLoginLoading(false);
+                }
+            };
+
+            const handleLogout = () => {
+                try { sessionStorage.removeItem(ACCESS_SESSION_KEY); } catch (error) {}
+                setAccessUser(null);
+                setLoginCedula('');
+                setLoginCodigo('');
+                setLoginError('');
+            };
+
+            // CÁLCULOS DE INDICADORES
+            // Base seleccionable: OIT K = 1.000.000 u OSHA K = 200.000.
+            // Trabajo usa HHE. In itinere usa HHT. El modo combinado suma
+            // Trabajo + In itinere y usa HHE + HHT.
             const filteredRecords = useMemo(() => {
                 return records.filter(r => {
                     const matchDept = filterDept === 'Todos' || r.department === filterDept;
@@ -209,136 +457,109 @@
                 });
             }, [records, filterDept, filterBranch, filterYear]);
 
+            const metricParts = (r, mode = filterType) => {
+                const work = {
+                    accidents: Number(r.work_accidents || 0),
+                    nlt: Number(r.work_acc || 0),
+                    nlpt: Number(r.work_lostTimeAcc || 0),
+                    days: Number(r.work_daysLost || 0) + Number(r.work_daysCharged || 0),
+                    denominator: Number(r.hours || 0)
+                };
+                const itinere = {
+                    accidents: Number(r.itinere_accidents || 0),
+                    nlt: Number(r.itinere_acc || 0),
+                    nlpt: Number(r.itinere_lostTimeAcc || 0),
+                    days: Number(r.itinere_daysLost || 0) + Number(r.itinere_daysCharged || 0),
+                    denominator: Number(r.travel_hours || 0)
+                };
+                if (mode === 'Itinere') return itinere;
+                if (mode === 'Combinado') {
+                    return {
+                        accidents: work.accidents + itinere.accidents,
+                        nlt: work.nlt + itinere.nlt,
+                        nlpt: work.nlpt + itinere.nlpt,
+                        days: work.days + itinere.days,
+                        denominator: work.denominator + itinere.denominator
+                    };
+                }
+                return work;
+            };
+
             const monthlyStats = useMemo(() => {
-                const map = {};
-                filteredRecords.forEach(r => {
-                    const k = r.month;
-                    if(!map[k]) map[k] = { 
-                        month: k, year: r.year, hours:0, workers:0, c:0, 
-                        dL:0, dC:0, aL:0, accT:0, 
-                        iti:0, itiD:0, mis:0, misD:0, rec:0, recD:0
-                    };
-                    map[k].hours += Number(r.hours || 0); 
-                    map[k].workers += Number(r.workers || 0); 
-                    map[k].c++;
-                    
-                    // Función auxiliar para lógica unificada
-                    const processEvent = (events, daysL, daysC) => {
-                        const evs = Number(events || 0);
-                        const days = Number(daysL || 0) + Number(daysC || 0);
-                        if (days > 0) map[k].aL += evs; 
-                        map[k].accT += evs; 
-                        map[k].dL += Number(daysL || 0);
-                        map[k].dC += Number(daysC || 0);
-                    };
+                return MONTHS.map(month => {
+                    const monthRecs = filteredRecords.filter(r => r.month === month);
+                    const hhe = monthRecs.reduce((s, r) => s + Number(r.hours || 0), 0);
+                    const hht = monthRecs.reduce((s, r) => s + Number(r.travel_hours || 0), 0);
+                    const workers = monthRecs.reduce((s, r) => s + Number(r.workers || 0), 0);
 
-                    // Procesar Trabajo
-                    processEvent(r.work_acc, r.work_daysLost, r.work_daysCharged);
-                    
-                    // Procesar Itinere
-                    map[k].iti += Number(r.itinere_acc || 0);
-                    map[k].itiD += (Number(r.itinere_daysLost || 0) + Number(r.itinere_daysCharged || 0));
-                    
-                    // Procesar Misión
-                    map[k].mis += Number(r.mission_acc || 0);
-                    map[k].misD += (Number(r.mission_daysLost || 0) + Number(r.mission_daysCharged || 0));
-                    
-                    // Procesar Recreativo
-                    map[k].rec += Number(r.recreation_acc || 0);
-                    map[k].recD += (Number(r.recreation_daysLost || 0) + Number(r.recreation_daysCharged || 0));
-                });
+                    const selected = monthRecs.reduce((acc, r) => {
+                        const part = metricParts(r, filterType);
+                        acc.accidents += part.accidents;
+                        acc.nlt += part.nlt;
+                        acc.nlpt += part.nlpt;
+                        acc.days += part.days;
+                        acc.denominator += part.denominator;
+                        return acc;
+                    }, { accidents: 0, nlt: 0, nlpt: 0, days: 0, denominator: 0 });
 
-                return MONTHS.map(m => {
-                    const d = map[m] || { month: m, hours:0, workers:0, c:1, dL:0, dC:0, aL:0, accT:0, iti:0, itiD:0, mis:0, misD:0, rec:0, recD:0 };
-                    const wAvg = Math.round(d.workers / (d.c||1));
-                    
-                    let filteredCount = 0;
-                    let filteredDays = 0;
-                    let filteredLostTimeEvents = 0; 
-
-                    const monthRecs = filteredRecords.filter(rec => rec.month === m);
-                    
-                    monthRecs.forEach(r => {
-                        let e = 0, dL = 0, dC = 0;
-                        
-                        if (filterType === 'Todos') {
-                            e = Number(r.work_acc || 0) + Number(r.itinere_acc || 0) + Number(r.mission_acc || 0) + Number(r.recreation_acc || 0);
-                            dL = Number(r.work_daysLost || 0) + Number(r.itinere_daysLost || 0) + Number(r.mission_daysLost || 0) + Number(r.recreation_daysLost || 0);
-                            dC = Number(r.work_daysCharged || 0) + Number(r.itinere_daysCharged || 0) + Number(r.mission_daysCharged || 0) + Number(r.recreation_daysCharged || 0);
-                        } else if (filterType === 'Trabajo') {
-                            e = Number(r.work_acc || 0); dL = Number(r.work_daysLost || 0); dC = Number(r.work_daysCharged || 0);
-                        } else if (filterType === 'Itinere') {
-                            e = Number(r.itinere_acc || 0); dL = Number(r.itinere_daysLost || 0); dC = Number(r.itinere_daysCharged || 0);
-                        } else if (filterType === 'Misión') {
-                            e = Number(r.mission_acc || 0); dL = Number(r.mission_daysLost || 0); dC = Number(r.mission_daysCharged || 0);
-                        } else if (filterType === 'Recreativo') {
-                            e = Number(r.recreation_acc || 0); dL = Number(r.recreation_daysLost || 0); dC = Number(r.recreation_daysCharged || 0);
-                        }
-
-                        filteredCount += e;
-                        filteredDays += (dL + dC);
-                        if ((dL + dC) > 0) filteredLostTimeEvents += e;
-                    });
+                    const workTotal = monthRecs.reduce((s,r) => s + Number(r.work_acc || 0), 0);
+                    const itiTotal = monthRecs.reduce((s,r) => s + Number(r.itinere_acc || 0), 0);
+                    const missionTotal = monthRecs.reduce((s,r) => s + Number(r.mission_acc || 0), 0);
+                    const recreationTotal = monthRecs.reduce((s,r) => s + Number(r.recreation_acc || 0), 0);
 
                     return {
-                        month: m, hours: d.hours, workersAvg: wAvg, 
-                        totalWorkAcc: d.accT, 
-                        
-                        ifn: safeCalc(filteredLostTimeEvents, d.hours, kValue),
-                        ifb: safeCalc(filteredCount, d.hours, kValue),
-                        is: safeCalc(filteredDays, d.hours, kValue),
-                        
-                        dynamicCount: filteredCount,
-                        dynamicDays: filteredDays,
-                        
-                        itinere_acc: d.iti, mission_acc: d.mis, recreation_acc: d.rec
+                        month,
+                        hhe,
+                        hht,
+                        hours: selected.denominator,
+                        workers,
+                        ifn: safeCalc(selected.nlpt, selected.denominator, kValue),
+                        ifb: safeCalc(selected.nlt, selected.denominator, kValue),
+                        is: safeCalc(selected.days, selected.denominator, kValue),
+                        ia: workers > 0 ? ((selected.accidents * 100) / workers).toFixed(2) : '0.00',
+                        accidentCount: selected.accidents,
+                        dynamicCount: selected.nlt,
+                        lostTimeCount: selected.nlpt,
+                        dynamicDays: selected.days,
+                        totalWorkAcc: workTotal,
+                        itinere_acc: itiTotal,
+                        mission_acc: missionTotal,
+                        recreation_acc: recreationTotal
                     };
                 });
-            }, [filteredRecords, kValue, filterType]);
+            }, [filteredRecords, filterType, kValue]);
 
             const globalStats = useMemo(() => {
-                const totalHours = monthlyStats.reduce((s, d) => s + d.hours, 0);
-                
-                let totalEvents = 0;
-                let totalLostTimeEvents = 0;
-                let totalDays = 0;
+                const totalDenominator = monthlyStats.reduce((s, d) => s + d.hours, 0);
+                const totalHHE = monthlyStats.reduce((s, d) => s + d.hhe, 0);
+                const totalHHT = monthlyStats.reduce((s, d) => s + d.hht, 0);
+                const totalAccidents = monthlyStats.reduce((s, d) => s + d.accidentCount, 0);
+                const totalEvents = monthlyStats.reduce((s, d) => s + d.dynamicCount, 0);
+                const totalLostTimeEvents = monthlyStats.reduce((s, d) => s + d.lostTimeCount, 0);
+                const totalDays = monthlyStats.reduce((s, d) => s + d.dynamicDays, 0);
 
-                filteredRecords.forEach(r => {
-                    let e = 0, dL = 0, dC = 0;
-                    
-                    if (filterType === 'Todos') {
-                        e = Number(r.work_acc || 0) + Number(r.itinere_acc || 0) + Number(r.mission_acc || 0) + Number(r.recreation_acc || 0);
-                        dL = Number(r.work_daysLost || 0) + Number(r.itinere_daysLost || 0) + Number(r.mission_daysLost || 0) + Number(r.recreation_daysLost || 0);
-                        dC = Number(r.work_daysCharged || 0) + Number(r.itinere_daysCharged || 0) + Number(r.mission_daysCharged || 0) + Number(r.recreation_daysCharged || 0);
-                    } else if (filterType === 'Trabajo') {
-                        e = Number(r.work_acc || 0); dL = Number(r.work_daysLost || 0); dC = Number(r.work_daysCharged || 0);
-                    } else if (filterType === 'Itinere') {
-                        e = Number(r.itinere_acc || 0); dL = Number(r.itinere_daysLost || 0); dC = Number(r.itinere_daysCharged || 0);
-                    } else if (filterType === 'Misión') {
-                        e = Number(r.mission_acc || 0); dL = Number(r.mission_daysLost || 0); dC = Number(r.mission_daysCharged || 0);
-                    } else if (filterType === 'Recreativo') {
-                        e = Number(r.recreation_acc || 0); dL = Number(r.recreation_daysLost || 0); dC = Number(r.recreation_daysCharged || 0);
-                    }
-
-                    totalEvents += e;
-                    totalDays += (dL + dC);
-                    if ((dL + dC) > 0) totalLostTimeEvents += e;
-                });
-                
-                const sumWork = filteredRecords.reduce((s,r) => s + Number(r.work_acc || 0), 0);
-                const sumIti = filteredRecords.reduce((s,r) => s + Number(r.itinere_acc || 0), 0);
-                const sumMis = filteredRecords.reduce((s,r) => s + Number(r.mission_acc || 0), 0);
-                const sumRec = filteredRecords.reduce((s,r) => s + Number(r.recreation_acc || 0), 0);
+                const activeMonths = monthlyStats.filter(d => d.workers > 0);
+                const avgWorkers = activeMonths.length
+                    ? activeMonths.reduce((s, d) => s + d.workers, 0) / activeMonths.length
+                    : 0;
 
                 return {
-                    hours: totalHours,
-                    ifn: safeCalc(totalLostTimeEvents, totalHours, kValue),
-                    ifb: safeCalc(totalEvents, totalHours, kValue),
-                    is: safeCalc(totalDays, totalHours, kValue),
+                    hours: totalDenominator,
+                    hhe: totalHHE,
+                    hht: totalHHT,
+                    workersAverage: avgWorkers,
+                    ifn: safeCalc(totalLostTimeEvents, totalDenominator, kValue),
+                    ifb: safeCalc(totalEvents, totalDenominator, kValue),
+                    is: safeCalc(totalDays, totalDenominator, kValue),
+                    ia: avgWorkers > 0 ? ((totalAccidents * 100) / avgWorkers).toFixed(2) : '0.00',
+                    accidentCountTotal: totalAccidents,
                     dynamicCountTotal: totalEvents,
-                    totalWorkAcc: sumWork, itinere: sumIti, mission: sumMis, rec: sumRec
+                    totalWorkAcc: filteredRecords.reduce((s,r) => s + Number(r.work_acc || 0), 0),
+                    itinere: filteredRecords.reduce((s,r) => s + Number(r.itinere_acc || 0), 0),
+                    mission: filteredRecords.reduce((s,r) => s + Number(r.mission_acc || 0), 0),
+                    rec: filteredRecords.reduce((s,r) => s + Number(r.recreation_acc || 0), 0)
                 };
-            }, [monthlyStats, filteredRecords, kValue, filterType]);
+            }, [monthlyStats, filteredRecords, kValue]);
 
             // --- EXPORTAR A EXCEL (Traducción + Plantilla) ---
             const exportData = () => {
@@ -398,19 +619,40 @@
                         let rawRecords = XLSX.utils.sheet_to_json(worksheet);
 
                         if (rawRecords.length > 0) {
+                            let legacyDetected = false;
                             const importedRecords = rawRecords.map((r, idx) => {
                                 const internalRecord = {};
                                 Object.keys(r).forEach(label => {
-                                    const key = LABELS_TO_FIELDS[label] || label; 
+                                    const key = LABELS_TO_FIELDS[label] || LEGACY_LABELS_TO_FIELDS[label] || label;
+                                    if (LEGACY_LABELS_TO_FIELDS[label]) legacyDetected = true;
                                     internalRecord[key] = r[label];
                                 });
-                                return { ...internalRecord, id: internalRecord.id || (Date.now() + idx).toString() };
+
+                                // Los respaldos anteriores no separaban NLT de NLPT ni registraban HHT.
+                                // No se inventan esos datos: se inicializan en cero para que el usuario los revise.
+                                return {
+                                    ...INITIAL_FORM,
+                                    ...internalRecord,
+                                    travel_hours: internalRecord.travel_hours ?? 0,
+                                    work_accidents: internalRecord.work_accidents ?? internalRecord.work_acc ?? 0,
+                                    work_acc: internalRecord.work_acc ?? internalRecord.work_accidents ?? 0,
+                                    itinere_accidents: internalRecord.itinere_accidents ?? internalRecord.itinere_acc ?? 0,
+                                    itinere_acc: internalRecord.itinere_acc ?? internalRecord.itinere_accidents ?? 0,
+                                    work_lostTimeAcc: internalRecord.work_lostTimeAcc ?? 0,
+                                    itinere_lostTimeAcc: internalRecord.itinere_lostTimeAcc ?? 0,
+                                    mission_lostTimeAcc: internalRecord.mission_lostTimeAcc ?? 0,
+                                    recreation_lostTimeAcc: internalRecord.recreation_lostTimeAcc ?? 0,
+                                    id: internalRecord.id || (Date.now() + idx).toString()
+                                };
                             });
 
                             setRecords(importedRecords);
                             const importedDepts = [...new Set(importedRecords.map(r => r.department))].filter(Boolean);
                             if (importedDepts.length > 0) setDepartments(prev => [...new Set([...prev, ...importedDepts])]);
-                            setNotification("Datos Excel importados correctamente.");
+                            setNotification(legacyDetected ? "Importado. Revise NLPT y HHT antes de usar los índices." : "Datos Excel importados correctamente.");
+                            if (legacyDetected) {
+                                alert("El archivo pertenece a una versión anterior. Se importaron los eventos antiguos como número de accidentes y, provisionalmente, como NLT; revise esa equivalencia. Además, NLPT (lesiones con tiempo perdido) y HHT no existían en ese formato. Revise y complete esos campos antes de interpretar IFN/IS de forma oficial.");
+                            }
                             if(importedRecords[0].year) setFilterYear(Number(importedRecords[0].year));
                             e.target.value = '';
                         } else {
@@ -473,15 +715,17 @@
 
                     pdf.addPage();
                     pdf.setFontSize(14);
-                    pdf.text(`Detalle de Datos - Año ${filterYear}`, margin, 20);
+                    const activeKOption = K_OPTIONS.find(option => option.value === kValue) || K_OPTIONS[0];
+                    pdf.text(`Año ${filterYear} · NVC 474:1997 · NTF 474:2014 · ${activeKOption.label} K=${kValue.toLocaleString('es-VE')} · ${filterType}`, margin, 20);
                     
-                    const columns = ["Mes", "H.H.E.", "IFN", "IFB", "IS", "Acc.", "Itinere", "Misión", "Rec."];
-                    const rows = monthlyStats.map(r => [ r.month, Number(r.hours).toLocaleString(), r.ifn, r.ifb, r.is, r.totalWorkAcc, r.itinere_acc, r.mission_acc, r.recreation_acc ]);
-                    rows.push(["TOTAL", globalStats.hours.toLocaleString(), globalStats.ifn, globalStats.ifb, globalStats.is, globalStats.totalWorkAcc, globalStats.itinere, globalStats.mission, globalStats.rec]);
+                    const denominatorLabelPDF = filterType === 'Trabajo' ? 'HHE' : (filterType === 'Itinere' ? 'HHT' : 'HHE+HHT');
+                    const columns = ["Mes", denominatorLabelPDF, "IFN", "IFB", "IS", "Acc.", "IA %", "Trabajo", "Itinere", "Misión", "Recr."];
+                    const rows = monthlyStats.map(r => [r.month, Number(r.hours).toLocaleString(), r.ifn, r.ifb, r.is, r.accidentCount, r.ia, r.totalWorkAcc, r.itinere_acc, r.mission_acc, r.recreation_acc]);
+                    rows.push(["TOTAL", globalStats.hours.toLocaleString(), globalStats.ifn, globalStats.ifb, globalStats.is, globalStats.accidentCountTotal, `${globalStats.ia}*`, globalStats.totalWorkAcc, globalStats.itinere, globalStats.mission, globalStats.rec]);
 
                     pdf.autoTable({
                         head: [columns], body: rows, startY: 30, theme: 'grid',
-                        headStyles: { fillColor: [0, 176, 80], textColor: 255, fontStyle: 'bold' },
+                        headStyles: { fillColor: [11, 42, 111], textColor: 255, fontStyle: 'bold' },
                         footStyles: { fillColor: [51, 65, 85], textColor: 255, fontStyle: 'bold' },
                         styles: { fontSize: 9, cellPadding: 3 },
                         didParseRow: function(data) { if (data.row.index === rows.length - 1) { data.row.styles.fontStyle = 'bold'; data.row.styles.fillColor = [220, 220, 220]; } }
@@ -492,18 +736,18 @@
                         pdf.setPage(i);
                         pdf.setFontSize(8);
                         pdf.setTextColor(150);
-                        const str = `Página ${i} de ${totalPages} - Elaborado por: David Linares Brea - www.movidasst.com`;
+                        const str = `Página ${i} de ${totalPages} - ${activeKOption.label} K=${kValue.toLocaleString('es-VE')} - www.movidasst.com`;
                         pdf.text(str, margin, pdfHeight - 10);
                     }
 
-                    pdf.save(`SST_Reporte_Completo_${filterYear}.pdf`);
+                    pdf.save(`MovidaSST_NTF474_${filterType}_${filterYear}.pdf`);
                     setNotification("Reporte Completo Generado");
                 } catch (err) { console.error("Error PDF:", err); alert("Error al generar PDF."); if(document.querySelector('div[style*="z-index: 10000"]')) document.body.removeChild(document.querySelector('div[style*="z-index: 10000"]')); } finally { setIsExporting(false); }
             };
 
             const confirmReset = () => {
-                setRecords([]); setDepartments(INITIAL_DEPARTMENTS); setBranches(INITIAL_BRANCHES); setKValue(1000000); 
-                setFilterDept('Todos'); setFilterBranch('Todos'); setFilterType('Todos'); setFilterYear(new Date().getFullYear());
+                setRecords([]); setDepartments(INITIAL_DEPARTMENTS); setBranches(INITIAL_BRANCHES); setKValue(DEFAULT_K);
+                setFilterDept('Todos'); setFilterBranch('Todos'); setFilterType('Trabajo'); setFilterYear(new Date().getFullYear());
                 setFormData({...INITIAL_FORM, department: INITIAL_DEPARTMENTS[0], branchId: INITIAL_BRANCHES[0].id});
                 setShowResetModal(false); setNotification("Sistema reiniciado correctamente."); setView('dashboard');
             };
@@ -518,10 +762,10 @@
                 const recs = []; const rand = (a, b) => Math.floor(Math.random()*(b-a+1))+a;
                 const year = new Date().getFullYear();
                 MONTHS.forEach((m, i) => {
-                    recs.push({id: `demo-${i}-1`, month: m, year, department: 'Producción', branchId: 'b1', hours: 5000, workers: 30, work_acc: rand(0,2), work_daysLost: rand(0,5), work_daysCharged: 0, itinere_acc: 0, itinere_daysLost: 0, itinere_daysCharged: 0, mission_acc: 0, mission_daysLost: 0, mission_daysCharged: 0, recreation_acc: 0, recreation_daysLost: 0, recreation_daysCharged: 0});
-                    recs.push({id: `demo-${i}-2`, month: m, year, department: 'Ventas', branchId: 'b2', hours: 3000, workers: 15, work_acc: 0, work_daysLost: 0, work_daysCharged: 0, itinere_acc: rand(0,1), itinere_daysLost: rand(0,3), itinere_daysCharged: 0, mission_acc: rand(0,1), mission_daysLost: 0, mission_daysCharged: 0, recreation_acc: 0, recreation_daysLost: 0, recreation_daysCharged: 0});
+                    const workNLT = rand(0,2); const workNLPT = workNLT > 0 ? rand(0,workNLT) : 0; recs.push({id: `demo-${i}-1`, month: m, year, department: 'Producción', branchId: 'b1', hours: 5000, travel_hours: 0, workers: 30, work_accidents: workNLT, work_acc: workNLT, work_lostTimeAcc: workNLPT, work_daysLost: workNLPT ? rand(1,5) : 0, work_daysCharged: 0, itinere_accidents: 0, itinere_acc: 0, itinere_lostTimeAcc: 0, itinere_daysLost: 0, itinere_daysCharged: 0, mission_acc: 0, mission_lostTimeAcc: 0, mission_daysLost: 0, mission_daysCharged: 0, recreation_acc: 0, recreation_lostTimeAcc: 0, recreation_daysLost: 0, recreation_daysCharged: 0});
+                    const itiNLT = rand(0,1); const itiNLPT = itiNLT; recs.push({id: `demo-${i}-2`, month: m, year, department: 'Ventas', branchId: 'b2', hours: 3000, travel_hours: 900, workers: 15, work_accidents: 0, work_acc: 0, work_lostTimeAcc: 0, work_daysLost: 0, work_daysCharged: 0, itinere_accidents: itiNLT, itinere_acc: itiNLT, itinere_lostTimeAcc: itiNLPT, itinere_daysLost: itiNLPT ? rand(1,3) : 0, itinere_daysCharged: 0, mission_acc: rand(0,1), mission_lostTimeAcc: 0, mission_daysLost: 0, mission_daysCharged: 0, recreation_acc: 0, recreation_lostTimeAcc: 0, recreation_daysLost: 0, recreation_daysCharged: 0});
                 });
-                setRecords(recs); setFilterYear(year); setFilterDept('Todos'); setFilterBranch('Todos'); setFilterType('Todos'); setView('dashboard'); setShowDemoModal(false); setNotification("Datos demo cargados exitosamente.");
+                setRecords(recs); setFilterYear(year); setFilterDept('Todos'); setFilterBranch('Todos'); setFilterType('Trabajo'); setView('dashboard'); setShowDemoModal(false); setNotification("Datos demo cargados exitosamente.");
             };
             const handleLoadDemo = () => setShowDemoModal(true);
 
@@ -532,15 +776,88 @@
             
             const handleSubmit = (e) => {
                 e.preventDefault();
-                const newRec = { ...formData, id: Date.now(), year: Number(formData.year), hours: Number(formData.hours), workers: Number(formData.workers), work_acc: Number(formData.work_acc), work_daysLost: Number(formData.work_daysLost), work_daysCharged: Number(formData.work_daysCharged), itinere_acc: Number(formData.itinere_acc), itinere_daysLost: Number(formData.itinere_daysLost), itinere_daysCharged: Number(formData.itinere_daysCharged), mission_acc: Number(formData.mission_acc), mission_daysLost: Number(formData.mission_daysLost), mission_daysCharged: Number(formData.mission_daysCharged), recreation_acc: Number(formData.recreation_acc), recreation_daysLost: Number(formData.recreation_daysLost), recreation_daysCharged: Number(formData.recreation_daysCharged) };
-                if(editingId) { setRecords(records.map(r => r.id === editingId ? {...newRec, id: editingId} : r)); setNotification("Actualizado."); setEditingId(null); } else { setRecords([...records, newRec]); setNotification("Guardado."); }
-                
-                // AUTO-VISUALIZACIÓN:
-                setFilterYear(Number(formData.year));
-                setFilterType('Todos'); 
 
-                const idx = MONTHS.indexOf(formData.month); const nextMonth = MONTHS[(idx + 1) % 12];
-                setFormData({...formData, month: nextMonth, hours: '', workers: '', work_acc: '0', work_daysLost: '0', work_daysCharged: '0', itinere_acc: '0', itinere_daysLost: '0', itinere_daysCharged: '0', mission_acc: '0', mission_daysLost: '0', mission_daysCharged: '0', recreation_acc: '0', recreation_daysLost: '0', recreation_daysCharged: '0'});
+                const numericFields = [
+                    'year','hours','travel_hours','workers',
+                    'work_accidents','work_acc','work_lostTimeAcc','work_daysLost','work_daysCharged',
+                    'itinere_accidents','itinere_acc','itinere_lostTimeAcc','itinere_daysLost','itinere_daysCharged',
+                    'mission_acc','mission_lostTimeAcc','mission_daysLost','mission_daysCharged',
+                    'recreation_acc','recreation_lostTimeAcc','recreation_daysLost','recreation_daysCharged'
+                ];
+                const newRec = { ...formData, id: Date.now() };
+                numericFields.forEach(key => newRec[key] = Number(formData[key] || 0));
+
+                const invalidNegative = numericFields.some(key => key !== 'year' && Number(newRec[key]) < 0);
+                if (invalidNegative) {
+                    alert('No se permiten valores negativos.');
+                    return;
+                }
+                if (newRec.work_lostTimeAcc > newRec.work_acc || newRec.itinere_lostTimeAcc > newRec.itinere_acc) {
+                    alert('NLPT no puede ser mayor que NLT. Revise las lesiones con tiempo perdido.');
+                    return;
+                }
+                if (newRec.mission_lostTimeAcc > newRec.mission_acc || newRec.recreation_lostTimeAcc > newRec.recreation_acc) {
+                    alert('En los registros complementarios, los casos con tiempo perdido no pueden superar el total de eventos registrados.');
+                    return;
+                }
+                if (newRec.work_acc > 0 && newRec.work_accidents <= 0) {
+                    alert('Registre el número de accidentes de trabajo para calcular IA. Puede ser distinto de NLT.');
+                    return;
+                }
+                if (newRec.itinere_acc > 0 && newRec.itinere_accidents <= 0) {
+                    alert('Registre el número de accidentes in itinere para calcular IA.');
+                    return;
+                }
+                if ((newRec.work_acc > 0 || newRec.work_accidents > 0) && newRec.hours <= 0) {
+                    alert('Para calcular los índices de accidentes de trabajo debe registrar HHE.');
+                    return;
+                }
+                if ((newRec.itinere_acc > 0 || newRec.itinere_accidents > 0) && newRec.travel_hours <= 0) {
+                    alert('Para calcular índices In Itinere debe registrar HHT (horas-hombre de trayecto).');
+                    return;
+                }
+
+                const duplicate = records.find(r =>
+                    r.id !== editingId &&
+                    Number(r.year) === Number(newRec.year) &&
+                    r.month === newRec.month &&
+                    r.department === newRec.department &&
+                    r.branchId === newRec.branchId
+                );
+                if (duplicate) {
+                    alert('Ya existe un registro para esa sucursal, departamento, mes y año. Edite el registro existente para evitar doble conteo.');
+                    return;
+                }
+
+                if(editingId) {
+                    setRecords(records.map(r => r.id === editingId ? {...newRec, id: editingId} : r));
+                    setNotification('Registro actualizado.');
+                    setEditingId(null);
+                } else {
+                    setRecords([...records, newRec]);
+                    setNotification('Registro guardado.');
+                }
+
+                setFilterYear(Number(formData.year));
+                setFilterDept('Todos');
+                setFilterBranch('Todos');
+                setFilterType('Trabajo');
+
+                const idx = MONTHS.indexOf(formData.month);
+                const nextMonth = MONTHS[(idx + 1) % 12];
+                const nextYear = idx === 11 ? Number(formData.year) + 1 : Number(formData.year);
+                setFormData({
+                    ...formData,
+                    month: nextMonth,
+                    year: nextYear,
+                    hours: '',
+                    travel_hours: '',
+                    workers: '',
+                    work_accidents: '0', work_acc: '0', work_lostTimeAcc: '0', work_daysLost: '0', work_daysCharged: '0',
+                    itinere_accidents: '0', itinere_acc: '0', itinere_lostTimeAcc: '0', itinere_daysLost: '0', itinere_daysCharged: '0',
+                    mission_acc: '0', mission_lostTimeAcc: '0', mission_daysLost: '0', mission_daysCharged: '0',
+                    recreation_acc: '0', recreation_lostTimeAcc: '0', recreation_daysLost: '0', recreation_daysCharged: '0'
+                });
             };
             const handleEdit = (r) => { const strRec = Object.fromEntries(Object.entries(r).map(([k, v]) => [k, String(v)])); setFormData(strRec); setEditingId(r.id); setView('input'); window.scrollTo({top: 0, behavior: 'smooth'}); };
             const cancelEdit = () => { setEditingId(null); setFormData({...INITIAL_FORM, department: departments[0], branchId: branches[0].id}); setView('input'); };
@@ -549,130 +866,386 @@
             
             let content;
             switch(view) {
-                case 'dashboard':
-                    let typeTitle = filterType === 'Todos' ? 'GLOBAL' : filterType.toUpperCase();
+                case 'dashboard': {
+                    const typeTitle = filterType === 'Itinere' ? 'IN ITINERE' : filterType.toUpperCase();
+                    const denominatorLabel = filterType === 'Trabajo' ? 'HHE' : (filterType === 'Itinere' ? 'HHT' : 'HHE + HHT');
+                    const activeMonthlyStats = monthlyStats.filter(r =>
+                        r.hhe > 0 || r.hht > 0 || r.totalWorkAcc > 0 || r.itinere_acc > 0 || r.mission_acc > 0 || r.recreation_acc > 0
+                    );
+
                     content = (
-                        <div className="space-y-8">
-                            <div className="flex flex-col md:flex-row justify-between items-center bg-white p-4 rounded-xl shadow-sm border border-slate-200 no-print gap-4">
-                                <h2 className="font-bold text-lg flex gap-2"><Icons.BarChart3 className="h-6 w-6 text-emerald-600"/> Dashboard {filterYear}</h2>
-                                <div className="flex flex-wrap gap-4 items-end">
-                                    <div className="flex flex-col"><label className="text-xs font-bold text-slate-500 mb-1">Sucursal</label><select value={filterBranch} onChange={e=>setFilterBranch(e.target.value)} className="p-1 border rounded text-sm w-40"><option value="Todos">Todas Sucursales</option>{branches.map(b=><option key={b.id} value={b.id}>{b.name}</option>)}</select></div>
-                                    <div className="flex flex-col"><label className="text-xs font-bold text-slate-500 mb-1">Departamento</label><select value={filterDept} onChange={e=>setFilterDept(e.target.value)} className="p-1 border rounded text-sm w-40"><option value="Todos">Todos Deptos</option>{departments.map(d=><option key={d} value={d}>{d}</option>)}</select></div>
-                                    <div className="flex flex-col"><label className="text-xs font-bold text-slate-500 mb-1">Evento</label><select value={filterType} onChange={e=>setFilterType(e.target.value)} className="p-1 border rounded text-sm font-bold text-emerald-700 bg-emerald-50 w-32">{EVENT_TYPES.map(t=><option key={t} value={t}>{t}</option>)}</select></div>
-                                    <div className="flex flex-col"><label className="text-xs font-bold text-slate-500 mb-1">Año</label><select value={filterYear} onChange={e=>setFilterYear(Number(e.target.value))} className="p-1 border rounded text-sm w-24">{YEARS.map(y => <option key={y} value={y}>{y}</option>)}</select></div>
+                        <div className="space-y-5 sm:space-y-7">
+                            <section className="bg-white p-4 sm:p-5 rounded-2xl shadow-sm border border-slate-200 no-print">
+                                <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+                                    <div>
+                                        <div className="flex items-center gap-2">
+                                            <Icons.BarChart3 className="h-5 w-5" style={{color: ACCENT_COLOR}}/>
+                                            <h2 className="font-extrabold text-lg text-slate-800">Panel estadístico {filterYear}</h2>
+                                        </div>
+                                        <p className="text-xs text-slate-500 mt-1">Base seleccionada: <strong>{(K_OPTIONS.find(o => o.value === kValue) || K_OPTIONS[0]).label}</strong> · K = {kValue.toLocaleString('es-VE')}.</p>
+                                    </div>
+                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 w-full xl:max-w-3xl">
+                                        <div>
+                                            <label className="label-text">Sucursal</label>
+                                            <select value={filterBranch} onChange={e=>setFilterBranch(e.target.value)} className="input-field">
+                                                <option value="Todos">Todas</option>{branches.map(b=><option key={b.id} value={b.id}>{b.name}</option>)}
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="label-text">Departamento</label>
+                                            <select value={filterDept} onChange={e=>setFilterDept(e.target.value)} className="input-field">
+                                                <option value="Todos">Todos</option>{departments.map(d=><option key={d} value={d}>{d}</option>)}
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="label-text">Modo de cálculo</label>
+                                            <select value={filterType} onChange={e=>setFilterType(e.target.value)} className="input-field font-bold" style={{color: BRAND_COLOR}}>
+                                                {EVENT_TYPES.map(t=><option key={t} value={t}>{t}</option>)}
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="label-text">Año</label>
+                                            <select value={filterYear} onChange={e=>setFilterYear(Number(e.target.value))} className="input-field">
+                                                {YEARS.map(y => <option key={y} value={y}>{y}</option>)}
+                                            </select>
+                                        </div>
+                                    </div>
                                 </div>
-                            </div>
-                            
-                            <div className="grid grid-cols-4 gap-4">
-                                <div className="bg-emerald-50 p-4 rounded-xl border border-emerald-100"><span className="text-xs font-bold text-emerald-600 uppercase">IFN ({typeTitle})</span><div className="text-3xl font-bold text-emerald-700 mt-1">{globalStats.ifn}</div></div>
-                                <div className="bg-sky-50 p-4 rounded-xl border border-sky-100"><span className="text-xs font-bold text-sky-600 uppercase">IFB ({typeTitle})</span><div className="text-3xl font-bold text-sky-700 mt-1">{globalStats.ifb}</div></div>
-                                <div className="bg-red-50 p-4 rounded-xl border border-red-100"><span className="text-xs font-bold text-red-600 uppercase">IS ({typeTitle})</span><div className="text-3xl font-bold text-red-700 mt-1">{globalStats.is}</div></div>
-                                <div className="bg-white p-4 rounded-xl border border-slate-200"><span className="text-xs font-bold text-slate-400 uppercase">Total Eventos ({typeTitle})</span><div className="text-3xl font-bold text-slate-700 mt-1">{globalStats.dynamicCountTotal}</div></div>
+                            </section>
+
+                            <div className="technical-note rounded-xl p-3 sm:p-4 text-xs sm:text-sm text-slate-700">
+                                <strong>{typeTitle}:</strong> el denominador usado es <strong>{denominatorLabel}</strong>.
+                                {filterType === 'Trabajo' && ' La NTF indica que los índices 3.18, 3.19 y 3.20 se calculan para accidentes ocurridos dentro del ambiente de trabajo.'}
+                                {filterType === 'Itinere' && ' Para trayecto, la NTF usa HHT (horas-hombre de trayecto habitual).'}
+                                {filterType === 'Combinado' && ' La Nota 2 permite combinar accidentes de trabajo e in itinere adicionando HHT a HHE.'}
                             </div>
 
-                            <div className="grid lg:grid-cols-2 gap-6">
-                                <div id="chart-ifn-container" className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm h-72 relative group">
-                                    <div className="flex justify-between mb-2"><h3 className="text-xs font-bold text-slate-500">TENDENCIA {typeTitle} (IFN vs IFB)</h3><button onClick={()=>downloadElementAsPng('chart-ifn-container', 'Grafico_Tendencia')} className="text-slate-400 hover:text-blue-500 no-print" title="Descargar PNG"><Icons.Camera className="h-4 w-4"/></button></div>
-                                    <div className="h-full pb-6"><SimpleLineChart data={monthlyStats} dataKey1="ifn" dataKey2="ifb" color1={BRAND_COLOR} color2="#0ea5e9"/></div>
-                                    <div className="flex justify-center gap-4 mt-2"><div className="flex items-center gap-1 text-xs"><span className="w-3 h-3 rounded-full" style={{backgroundColor: BRAND_COLOR}}></span> IFN</div><div className="flex items-center gap-1 text-xs"><span className="w-3 h-3 rounded-full bg-[#0ea5e9]"></span> IFB</div></div>
+                            <section className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-4">
+                                <div className="metric-card bg-emerald-50 p-3 sm:p-4 rounded-2xl border border-emerald-100">
+                                    <span className="text-[11px] sm:text-xs font-extrabold text-emerald-700 uppercase">IFN</span>
+                                    <div className="metric-value text-2xl sm:text-3xl font-black text-emerald-800 mt-1">{globalStats.ifn}</div>
+                                    <div className="text-[11px] sm:text-xs text-emerald-700/70 mt-1">NLPT × {kValue.toLocaleString('es-VE')} / {denominatorLabel}</div>
                                 </div>
-                                <div id="chart-is-container" className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm h-72 relative group">
-                                    <div className="flex justify-between mb-2"><h3 className="text-xs font-bold text-slate-500">SEVERIDAD {typeTitle} (IS)</h3><button onClick={()=>downloadElementAsPng('chart-is-container', 'Grafico_Severidad')} className="text-slate-400 hover:text-blue-500 no-print" title="Descargar PNG"><Icons.Camera className="h-4 w-4"/></button></div>
-                                    <div className="h-full pb-6"><SimpleBarChart data={monthlyStats} dataKey="is" color="#ef4444"/></div>
+                                <div className="metric-card bg-sky-50 p-3 sm:p-4 rounded-2xl border border-sky-100">
+                                    <span className="text-[11px] sm:text-xs font-extrabold text-sky-700 uppercase">IFB</span>
+                                    <div className="metric-value text-2xl sm:text-3xl font-black text-sky-800 mt-1">{globalStats.ifb}</div>
+                                    <div className="text-[11px] sm:text-xs text-sky-700/70 mt-1">NLT × {kValue.toLocaleString('es-VE')} / {denominatorLabel}</div>
                                 </div>
-                            </div>
-                            <div id="summary-table-container" className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden relative group">
-                                <div className="p-4 bg-slate-50 border-b border-slate-200 flex justify-between items-center"><h3 className="font-bold text-sm text-slate-700">Resumen Mensual Detallado</h3><button onClick={()=>downloadElementAsPng('summary-table-container', 'Tabla_Resumen')} className="text-slate-400 hover:text-blue-500 bg-white p-1 rounded border no-print" title="Descargar PNG"><Icons.Camera className="h-4 w-4"/></button></div>
-                                <div className="overflow-x-auto">
-                                    <table className="w-full text-xs text-left">
-                                        <thead><tr className="bg-white border-b"><th className="p-3">Mes</th><th className="p-3 text-right">H.H.E.</th><th className="p-3 text-center text-emerald-700">IFN</th><th className="p-3 text-center text-sky-700">IFB</th><th className="p-3 text-center text-red-700">IS</th><th className="p-3 text-center bg-slate-50 font-bold">Acc. Trab.</th><th className="p-3 text-center">Itinere</th><th className="p-3 text-center">Misión</th><th className="p-3 text-center">Rec.</th></tr></thead>
-                                        <tbody>{monthlyStats.map((r,i) => <tr key={i} className="border-b hover:bg-slate-50"><td className="p-3 font-medium">{r.month}</td><td className="p-3 text-right text-slate-500">{Number(r.hours).toLocaleString()}</td><td className="p-3 text-center font-bold text-emerald-600">{r.ifn}</td><td className="p-3 text-center font-bold text-sky-600">{r.ifb}</td><td className="p-3 text-center font-bold text-red-600">{r.is}</td><td className="p-3 text-center bg-slate-50 font-bold text-slate-700">{r.totalWorkAcc}</td><td className="p-3 text-center text-slate-400">{r.itinere_acc}</td><td className="p-3 text-center text-slate-400">{r.mission_acc}</td><td className="p-3 text-center text-slate-400">{r.recreation_acc}</td></tr>)}</tbody>
-                                        <tfoot className="bg-slate-800 text-white font-bold"><tr><td className="p-3">TOTAL</td><td className="p-3 text-right">{globalStats.hours.toLocaleString()}</td><td className="p-3 text-center text-emerald-300">{globalStats.ifn}</td><td className="p-3 text-center text-sky-300">{globalStats.ifb}</td><td className="p-3 text-center text-red-300">{globalStats.is}</td><td className="p-3 text-center bg-slate-700">{globalStats.totalWorkAcc}</td><td className="p-3 text-center bg-slate-700">{globalStats.itinere}</td><td className="p-3 text-center bg-slate-700">{globalStats.mission}</td><td className="p-3 text-center bg-slate-700">{globalStats.rec}</td></tr></tfoot>
+                                <div className="metric-card bg-rose-50 p-3 sm:p-4 rounded-2xl border border-rose-100">
+                                    <span className="text-[11px] sm:text-xs font-extrabold text-rose-700 uppercase">IS</span>
+                                    <div className="metric-value text-2xl sm:text-3xl font-black text-rose-800 mt-1">{globalStats.is}</div>
+                                    <div className="text-[11px] sm:text-xs text-rose-700/70 mt-1">(TDP + cargos) × {kValue.toLocaleString('es-VE')} / {denominatorLabel}</div>
+                                </div>
+                                <div className="metric-card bg-white p-3 sm:p-4 rounded-2xl border border-slate-200">
+                                    <span className="text-[11px] sm:text-xs font-extrabold text-slate-500 uppercase">Lesiones NLT</span>
+                                    <div className="metric-value text-2xl sm:text-3xl font-black text-slate-800 mt-1">{globalStats.dynamicCountTotal}</div>
+                                    <div className="text-[11px] sm:text-xs text-slate-500 mt-1">{typeTitle}</div>
+                                </div>
+                                <div className="metric-card bg-white p-3 sm:p-4 rounded-2xl border border-slate-200">
+                                    <span className="text-[11px] sm:text-xs font-extrabold text-slate-500 uppercase">Accidentes</span>
+                                    <div className="metric-value text-2xl sm:text-3xl font-black text-slate-800 mt-1">{globalStats.accidentCountTotal}</div>
+                                    <div className="text-[11px] sm:text-xs text-slate-500 mt-1">numerador IA</div>
+                                </div>
+                                <div className="metric-card bg-white p-3 sm:p-4 rounded-2xl border border-slate-200">
+                                    <span className="text-[11px] sm:text-xs font-extrabold text-slate-500 uppercase">IA anual*</span>
+                                    <div className="metric-value text-2xl sm:text-3xl font-black text-slate-800 mt-1">{globalStats.ia}%</div>
+                                    <div className="text-[11px] sm:text-xs text-slate-500 mt-1">*usa plantilla mensual media</div>
+                                </div>
+                            </section>
+
+                            <section className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+                                <div id="chart-ifn-container" className="bg-white p-3 sm:p-4 rounded-2xl border border-slate-200 shadow-sm h-64 sm:h-72 relative">
+                                    <div className="flex justify-between gap-3 mb-2">
+                                        <h3 className="text-xs font-extrabold text-slate-600">TENDENCIA {typeTitle} · IFN / IFB</h3>
+                                        <button onClick={()=>downloadElementAsPng('chart-ifn-container', 'Grafico_Tendencia')} className="text-slate-400 hover:text-blue-600 no-print min-h-0" title="Descargar PNG" aria-label="Descargar gráfico de tendencia"><Icons.Camera className="h-4 w-4"/></button>
+                                    </div>
+                                    <div className="h-[calc(100%-24px)]"><SimpleLineChart data={monthlyStats} dataKey1="ifn" dataKey2="ifb" color1={SUCCESS_COLOR} color2="#0ea5e9"/></div>
+                                </div>
+                                <div id="chart-is-container" className="bg-white p-3 sm:p-4 rounded-2xl border border-slate-200 shadow-sm h-64 sm:h-72 relative">
+                                    <div className="flex justify-between gap-3 mb-2">
+                                        <h3 className="text-xs font-extrabold text-slate-600">SEVERIDAD {typeTitle} · IS</h3>
+                                        <button onClick={()=>downloadElementAsPng('chart-is-container', 'Grafico_Severidad')} className="text-slate-400 hover:text-blue-600 no-print min-h-0" title="Descargar PNG" aria-label="Descargar gráfico de severidad"><Icons.Camera className="h-4 w-4"/></button>
+                                    </div>
+                                    <div className="h-[calc(100%-24px)]"><SimpleBarChart data={monthlyStats} dataKey="is" color="#ef4444"/></div>
+                                </div>
+                            </section>
+
+                            <section id="summary-table-container" className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden relative">
+                                <div className="p-4 bg-slate-50 border-b border-slate-200 flex justify-between items-center gap-3">
+                                    <div>
+                                        <h3 className="font-extrabold text-sm text-slate-800">Resumen mensual</h3>
+                                        <p className="text-[11px] text-slate-500 mt-0.5">Denominador: {denominatorLabel}</p>
+                                    </div>
+                                    <button onClick={()=>downloadElementAsPng('summary-table-container', 'Tabla_Resumen')} className="text-slate-400 hover:text-blue-600 bg-white p-2 rounded-lg border no-print min-h-0" title="Descargar PNG" aria-label="Descargar tabla resumen"><Icons.Camera className="h-4 w-4"/></button>
+                                </div>
+
+                                <div className="mobile-records p-3">
+                                    {activeMonthlyStats.length === 0 && <div className="text-sm text-slate-500 text-center py-6">No hay datos para los filtros seleccionados.</div>}
+                                    {activeMonthlyStats.map(r => (
+                                        <div key={r.month} className="rounded-xl border border-slate-200 p-3">
+                                            <div className="flex justify-between items-start gap-3">
+                                                <div>
+                                                    <div className="font-extrabold text-slate-800">{r.month}</div>
+                                                    <div className="text-[11px] text-slate-500">{denominatorLabel}: {Number(r.hours).toLocaleString()}</div>
+                                                </div>
+                                                <div className="text-right">
+                                                    <div className="text-[11px] text-slate-500">NLT / Acc.</div>
+                                                    <div className="font-black text-slate-800">{r.dynamicCount} / {r.accidentCount}</div>
+                                                </div>
+                                            </div>
+                                            <div className="grid grid-cols-4 gap-2 mt-3 text-center">
+                                                <div className="bg-emerald-50 rounded-lg p-2"><div className="text-[11px] text-emerald-700 font-bold">IFN</div><div className="font-black text-emerald-800">{r.ifn}</div></div>
+                                                <div className="bg-sky-50 rounded-lg p-2"><div className="text-[11px] text-sky-700 font-bold">IFB</div><div className="font-black text-sky-800">{r.ifb}</div></div>
+                                                <div className="bg-rose-50 rounded-lg p-2"><div className="text-[11px] text-rose-700 font-bold">IS</div><div className="font-black text-rose-800">{r.is}</div></div>
+                                                <div className="bg-slate-50 rounded-lg p-2"><div className="text-[11px] text-slate-500 font-bold">IA</div><div className="font-black text-slate-800">{r.ia}%</div></div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                <div className="desktop-table overflow-x-auto">
+                                    <table className="w-full text-xs text-left min-w-[900px]">
+                                        <thead>
+                                            <tr className="bg-white border-b">
+                                                <th className="p-3">Mes</th>
+                                                <th className="p-3 text-right">{denominatorLabel}</th>
+                                                <th className="p-3 text-center text-emerald-700">IFN</th>
+                                                <th className="p-3 text-center text-sky-700">IFB</th>
+                                                <th className="p-3 text-center text-rose-700">IS</th>
+                                                <th className="p-3 text-center">Acc.</th>
+                                                <th className="p-3 text-center">IA</th>
+                                                <th className="p-3 text-center bg-slate-50 font-bold">Trabajo</th>
+                                                <th className="p-3 text-center">Itinere</th>
+                                                <th className="p-3 text-center">Misión</th>
+                                                <th className="p-3 text-center">Recreativo</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>{monthlyStats.map(r => (
+                                            <tr key={r.month} className="border-b hover:bg-slate-50">
+                                                <td className="p-3 font-medium">{r.month}</td>
+                                                <td className="p-3 text-right text-slate-500">{Number(r.hours).toLocaleString()}</td>
+                                                <td className="p-3 text-center font-bold text-emerald-700">{r.ifn}</td>
+                                                <td className="p-3 text-center font-bold text-sky-700">{r.ifb}</td>
+                                                <td className="p-3 text-center font-bold text-rose-700">{r.is}</td>
+                                                <td className="p-3 text-center">{r.accidentCount}</td>
+                                                <td className="p-3 text-center">{r.ia}%</td>
+                                                <td className="p-3 text-center bg-slate-50 font-bold text-slate-700">{r.totalWorkAcc}</td>
+                                                <td className="p-3 text-center text-slate-500">{r.itinere_acc}</td>
+                                                <td className="p-3 text-center text-slate-500">{r.mission_acc}</td>
+                                                <td className="p-3 text-center text-slate-500">{r.recreation_acc}</td>
+                                            </tr>
+                                        ))}</tbody>
+                                        <tfoot className="bg-slate-800 text-white font-bold">
+                                            <tr>
+                                                <td className="p-3">TOTAL</td>
+                                                <td className="p-3 text-right">{globalStats.hours.toLocaleString()}</td>
+                                                <td className="p-3 text-center text-emerald-300">{globalStats.ifn}</td>
+                                                <td className="p-3 text-center text-sky-300">{globalStats.ifb}</td>
+                                                <td className="p-3 text-center text-rose-300">{globalStats.is}</td>
+                                                <td className="p-3 text-center">{globalStats.accidentCountTotal}</td>
+                                                <td className="p-3 text-center">{globalStats.ia}%*</td>
+                                                <td className="p-3 text-center bg-slate-700">{globalStats.totalWorkAcc}</td>
+                                                <td className="p-3 text-center bg-slate-700">{globalStats.itinere}</td>
+                                                <td className="p-3 text-center bg-slate-700">{globalStats.mission}</td>
+                                                <td className="p-3 text-center bg-slate-700">{globalStats.rec}</td>
+                                            </tr>
+                                        </tfoot>
                                     </table>
                                 </div>
-                            </div>
+                            </section>
+
+                            <section className="bg-white rounded-2xl border border-slate-200 p-4">
+                                <h3 className="font-extrabold text-sm text-slate-800">Registros complementarios</h3>
+                                <p className="text-xs text-slate-500 mt-1">Misión y recreativos se conservan como conteos complementarios; esta versión no los mezcla en los índices NVC 474:1997 · NTF 474:2014.</p>
+                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-3 text-center">
+                                    <div className="rounded-xl bg-slate-50 p-3"><div className="text-xs text-slate-500">Trabajo</div><div className="text-xl font-black">{globalStats.totalWorkAcc}</div></div>
+                                    <div className="rounded-xl bg-slate-50 p-3"><div className="text-xs text-slate-500">In itinere</div><div className="text-xl font-black">{globalStats.itinere}</div></div>
+                                    <div className="rounded-xl bg-slate-50 p-3"><div className="text-xs text-slate-500">Misión</div><div className="text-xl font-black">{globalStats.mission}</div></div>
+                                    <div className="rounded-xl bg-slate-50 p-3"><div className="text-xs text-slate-500">Recreativos</div><div className="text-xl font-black">{globalStats.rec}</div></div>
+                                </div>
+                            </section>
                         </div>
                     );
                     break;
+                }
+
                 case 'input':
                     content = (
-                        <div className="animate-in fade-in no-print">
-                            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden mb-8">
-                                <div className="p-4 flex items-center justify-between border-b border-slate-100 bg-slate-50">
-                                    <h2 className="font-bold flex items-center gap-2 text-lg" style={{ color: NEUTRAL_COLOR }}>{editingId ? <><Icons.Edit2 className="h-5 w-5 text-amber-500" /> Editando</> : <><Icons.FileText className="h-5 w-5" style={{ color: BRAND_COLOR }} /> Nuevo Registro</>}</h2>
-                                    {editingId && <button onClick={cancelEdit} className="text-xs bg-slate-200 px-3 py-1 rounded">Cancelar</button>}
+                        <div className="animate-in fade-in no-print space-y-5">
+                            <section className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                                <div className="p-4 sm:p-5 flex items-center justify-between gap-3 border-b border-slate-100 bg-slate-50">
+                                    <div>
+                                        <h2 className="font-extrabold flex items-center gap-2 text-lg text-slate-800">
+                                            {editingId ? <><Icons.Edit2 className="h-5 w-5 text-amber-500" /> Editar registro</> : <><Icons.FileText className="h-5 w-5" style={{ color: BRAND_COLOR }} /> Nuevo registro mensual</>}
+                                        </h2>
+                                        <p className="text-xs text-slate-500 mt-1">Datos base para NVC 474:1997 · NTF 474:2014 y registros complementarios.</p>
+                                    </div>
+                                    {editingId && <button onClick={cancelEdit} className="header-btn btn-action">Cancelar</button>}
                                 </div>
-                                <form onSubmit={handleSubmit} className="p-6 space-y-8">
-                                    <div className="bg-blue-50 border border-blue-100 rounded-lg p-4 mb-6 text-xs text-blue-800 space-y-1">
-                                        <h3 className="font-bold mb-2 flex items-center gap-2"><Icons.Info className="h-4 w-4"/> Guía de Clasificación de Accidentes</h3>
-                                        <p><strong>Accidente de Trabajo:</strong> Ocurridos dentro de la empresa.</p>
-                                        <p><strong>In Itinere:</strong> Ocurridos en el trayecto habitual entre la casa y el trabajo (o viceversa).</p>
-                                        <p><strong>En Misión:</strong> Ocurridos fuera de la empresa cumpliendo una orden o actividad asignada.</p>
-                                        <p><strong>Recreativos:</strong> Ocurridos durante actividades deportivas o culturales patrocinadas por el empleador.</p>
+
+                                <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-6">
+                                    <div className="technical-note rounded-xl p-3 text-xs sm:text-sm text-slate-700 space-y-1">
+                                        <p><strong>Trabajo:</strong> IFN, IFB e IS usan HHE.</p>
+                                        <p><strong>In itinere:</strong> se registra aparte y sus índices usan HHT.</p>
+                                        <p><strong>Combinado:</strong> la NTF permite sumar Trabajo + In itinere usando HHE + HHT.</p>
+                                        <p><strong>Importante:</strong> accidentes, NLT y NLPT son datos distintos. NLPT debe cargarse expresamente; no puede inferirse con precisión a partir de los días perdidos.</p>
                                     </div>
-                                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                                        <div><label className="label-text">Sucursal</label><select name="branchId" value={formData.branchId} onChange={handleInputChange} className="input-field">{branches.map(b=><option key={b.id} value={b.id}>{b.name}</option>)}</select></div>
-                                        <div><label className="label-text">Depto</label><select name="department" value={formData.department} onChange={handleInputChange} className="input-field">{departments.map(d=><option key={d} value={d}>{d}</option>)}</select></div>
-                                        <div className="grid grid-cols-2 gap-2"><div><label className="label-text">Mes</label><select name="month" value={formData.month} onChange={handleInputChange} className="input-field">{MONTHS.map(m=><option key={m} value={m}>{m}</option>)}</select></div><div><label className="label-text">Año</label><input type="number" name="year" value={formData.year} onChange={handleInputChange} className="input-field"/></div></div>
-                                        <div className="grid grid-cols-2 gap-2"><div><label className="label-text">H.H.E.</label><input type="number" name="hours" value={formData.hours} onChange={handleInputChange} className="input-field"/></div><div><label className="label-text">Trab.</label><input type="number" name="workers" value={formData.workers} onChange={handleInputChange} className="input-field"/></div></div>
-                                    </div>
-                                    <hr className="border-slate-100"/>
-                                    
-                                    <div className="grid grid-cols-1 gap-4">
-                                        <div className="bg-white p-4 rounded border border-emerald-200 bg-emerald-50">
-                                            <div className="flex items-center gap-2 mb-2 text-xs font-bold uppercase text-emerald-700">
-                                                <Icons.Briefcase className="h-4 w-4"/> Accidente de Trabajo
-                                            </div>
-                                            <div className="grid grid-cols-3 gap-2">
-                                                <div><label className="text-[10px]">Eventos</label><input type="number" name="work_acc" value={formData.work_acc} onChange={handleInputChange} className="input-field h-8 border-emerald-300" /></div>
-                                                <div><label className="text-[10px]">D. Perd.</label><input type="number" name="work_daysLost" value={formData.work_daysLost} onChange={handleInputChange} className="input-field h-8 border-emerald-300" /></div>
-                                                <div><label className="text-[10px]">D. Carg.</label><input type="number" name="work_daysCharged" value={formData.work_daysCharged} onChange={handleInputChange} className="input-field h-8 border-emerald-300" /></div>
-                                            </div>
-                                            <p className="text-[10px] text-emerald-600 mt-2 italic">
-                                                * Nota: Si registra días (Perdidos o Cargados), el evento se contará automáticamente como "Con Baja" para el cálculo del IFN. Si los días son 0, se contará como "Sin Baja". ESTA NOTA TAMBIÉN APLICA PARA ITINERE, EN MISIÓN Y RECREATIVOS.
-                                            </p>
+
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
+                                        <div className="lg:col-span-2">
+                                            <label className="label-text">Sucursal</label>
+                                            <select name="branchId" value={formData.branchId} onChange={handleInputChange} className="input-field">{branches.map(b=><option key={b.id} value={b.id}>{b.name}</option>)}</select>
+                                        </div>
+                                        <div className="lg:col-span-2">
+                                            <label className="label-text">Departamento</label>
+                                            <select name="department" value={formData.department} onChange={handleInputChange} className="input-field">{departments.map(d=><option key={d} value={d}>{d}</option>)}</select>
+                                        </div>
+                                        <div>
+                                            <label className="label-text">Mes</label>
+                                            <select name="month" value={formData.month} onChange={handleInputChange} className="input-field">{MONTHS.map(m=><option key={m} value={m}>{m}</option>)}</select>
+                                        </div>
+                                        <div>
+                                            <label className="label-text">Año</label>
+                                            <input type="number" name="year" min="2000" max="2100" value={formData.year} onChange={handleInputChange} className="input-field"/>
+                                        </div>
+                                        <div className="sm:col-span-2">
+                                            <label className="label-text">HHE · horas de exposición</label>
+                                            <input type="number" min="0" step="0.01" name="hours" value={formData.hours} onChange={handleInputChange} className="input-field" placeholder="Ej. 12.480"/>
+                                        </div>
+                                        <div className="sm:col-span-2">
+                                            <label className="label-text">HHT · horas de trayecto</label>
+                                            <input type="number" min="0" step="0.01" name="travel_hours" value={formData.travel_hours} onChange={handleInputChange} className="input-field" placeholder="Solo si calculará in itinere"/>
+                                        </div>
+                                        <div className="sm:col-span-2">
+                                            <label className="label-text">N.º trabajadores</label>
+                                            <input type="number" min="0" name="workers" value={formData.workers} onChange={handleInputChange} className="input-field" placeholder="Plantilla del período"/>
                                         </div>
                                     </div>
 
-                                    <div className="grid grid-cols-3 gap-4">
-                                        <CategoryCard icon={Icons.Truck} title="In Itinere" accName="itinere_acc" daysLostName="itinere_daysLost" daysChargedName="itinere_daysCharged" formData={formData} onChange={handleInputChange}/>
-                                        <CategoryCard icon={Icons.Plane} title="En Misión" accName="mission_acc" daysLostName="mission_daysLost" daysChargedName="mission_daysCharged" formData={formData} onChange={handleInputChange}/>
-                                        <CategoryCard icon={Icons.PartyPopper} title="Recreativos" accName="recreation_acc" daysLostName="recreation_daysLost" daysChargedName="recreation_daysCharged" formData={formData} onChange={handleInputChange}/>
+                                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                                        <MetricInputCard
+                                            icon={Icons.Briefcase}
+                                            title="Lesiones de trabajo · cálculo NTF"
+                                            tone="work"
+                                            accidentName="work_accidents"
+                                            accName="work_acc"
+                                            lostTimeName="work_lostTimeAcc"
+                                            daysLostName="work_daysLost"
+                                            daysChargedName="work_daysCharged"
+                                            formData={formData}
+                                            onChange={handleInputChange}
+                                        />
+                                        <MetricInputCard
+                                            icon={Icons.Truck}
+                                            title="Accidentes In Itinere · cálculo con HHT"
+                                            tone="itinere"
+                                            accidentName="itinere_accidents"
+                                            accName="itinere_acc"
+                                            lostTimeName="itinere_lostTimeAcc"
+                                            daysLostName="itinere_daysLost"
+                                            daysChargedName="itinere_daysCharged"
+                                            formData={formData}
+                                            onChange={handleInputChange}
+                                        />
                                     </div>
-                                    <div className="flex justify-end gap-2"><button type="submit" className="btn-primary-action header-btn px-4 py-2 rounded text-sm">Guardar</button></div>
+
+                                    <div>
+                                        <h3 className="font-extrabold text-sm text-slate-800 mb-2">Registros complementarios</h3>
+                                        <p className="text-xs text-slate-500 mb-3">Se almacenan para análisis, pero no se incorporan automáticamente a los índices NTF de esta versión.</p>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <MetricInputCard
+                                                icon={Icons.Plane}
+                                                title="En misión"
+                                                tone="neutral"
+                                                supplemental={true}
+                                                accName="mission_acc"
+                                                lostTimeName="mission_lostTimeAcc"
+                                                daysLostName="mission_daysLost"
+                                                daysChargedName="mission_daysCharged"
+                                                formData={formData}
+                                                onChange={handleInputChange}
+                                            />
+                                            <MetricInputCard
+                                                icon={Icons.PartyPopper}
+                                                title="Actividades recreativas"
+                                                tone="neutral"
+                                                supplemental={true}
+                                                accName="recreation_acc"
+                                                lostTimeName="recreation_lostTimeAcc"
+                                                daysLostName="recreation_daysLost"
+                                                daysChargedName="recreation_daysCharged"
+                                                formData={formData}
+                                                onChange={handleInputChange}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
+                                        {editingId && <button type="button" onClick={cancelEdit} className="header-btn btn-action w-full sm:w-auto">Cancelar</button>}
+                                        <button type="submit" className="btn-primary-action header-btn w-full sm:w-auto px-5">Guardar registro</button>
+                                    </div>
                                 </form>
-                            </div>
-                            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                                <div className="p-4 border-b border-slate-100 bg-slate-50 font-bold text-sm">Registros Existentes</div>
-                                <div className="overflow-x-auto max-h-60">
-                                    <table className="w-full text-xs text-left">
-                                        <thead className="bg-slate-50">
+                            </section>
+
+                            <section className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                                <div className="p-4 border-b border-slate-100 bg-slate-50">
+                                    <h3 className="font-extrabold text-sm text-slate-800">Registros existentes</h3>
+                                    <p className="text-xs text-slate-500 mt-1">{records.length} registro(s)</p>
+                                </div>
+
+                                <div className="mobile-records p-3">
+                                    {records.slice().reverse().map(r => {
+                                        const branchName = branches.find(b => b.id === r.branchId)?.name || 'N/A';
+                                        return (
+                                            <div key={r.id} className="rounded-xl border border-slate-200 p-3">
+                                                <div className="flex items-start justify-between gap-3">
+                                                    <div>
+                                                        <div className="font-extrabold text-slate-800">{r.month} {r.year}</div>
+                                                        <div className="text-xs text-slate-500 mt-0.5">{branchName} · {r.department}</div>
+                                                    </div>
+                                                    <div className="flex gap-1">
+                                                        <button onClick={()=>handleEdit(r)} className="header-btn btn-action px-2 min-h-0" aria-label="Editar registro"><Icons.Edit2 className="h-4 w-4"/></button>
+                                                        <button onClick={()=>handleDelete(r.id)} className="header-btn btn-danger-action px-2 min-h-0" aria-label="Eliminar registro"><Icons.Trash2 className="h-4 w-4"/></button>
+                                                    </div>
+                                                </div>
+                                                <div className="grid grid-cols-4 gap-2 mt-3 text-center text-xs">
+                                                    <div className="bg-slate-50 rounded-lg p-2"><span className="block text-[11px] text-slate-500">Trab.</span><strong>{Number(r.work_acc||0)}</strong></div>
+                                                    <div className="bg-slate-50 rounded-lg p-2"><span className="block text-[11px] text-slate-500">Itin.</span><strong>{Number(r.itinere_acc||0)}</strong></div>
+                                                    <div className="bg-slate-50 rounded-lg p-2"><span className="block text-[11px] text-slate-500">Misión</span><strong>{Number(r.mission_acc||0)}</strong></div>
+                                                    <div className="bg-slate-50 rounded-lg p-2"><span className="block text-[11px] text-slate-500">Recr.</span><strong>{Number(r.recreation_acc||0)}</strong></div>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                    {records.length === 0 && <div className="text-center text-sm text-slate-500 py-6">Aún no hay registros.</div>}
+                                </div>
+
+                                <div className="desktop-table overflow-x-auto max-h-72">
+                                    <table className="w-full text-xs text-left min-w-[760px]">
+                                        <thead className="bg-slate-50 sticky top-0">
                                             <tr>
-                                                <th className="p-2">Fecha</th>
-                                                <th className="p-2">Sucursal</th>
-                                                <th className="p-2">Depto</th>
-                                                <th className="p-2 text-center" title="Accidentes de Trabajo">Trab.</th>
-                                                <th className="p-2 text-center" title="In Itinere">Itin.</th>
-                                                <th className="p-2 text-center" title="En Misión">Mis.</th>
-                                                <th className="p-2 text-center" title="Recreativos">Rec.</th>
-                                                <th className="p-2 text-right">Acciones</th>
+                                                <th className="p-3">Fecha</th><th className="p-3">Sucursal</th><th className="p-3">Depto</th>
+                                                <th className="p-3 text-center">Trab.</th><th className="p-3 text-center">Itin.</th><th className="p-3 text-center">Misión</th><th className="p-3 text-center">Recr.</th>
+                                                <th className="p-3 text-right">Acciones</th>
                                             </tr>
                                         </thead>
                                         <tbody>
                                             {records.slice().reverse().map(r => {
                                                 const branchName = branches.find(b => b.id === r.branchId)?.name || 'N/A';
                                                 return (
-                                                    <tr key={r.id} className="border-t hover:bg-slate-50 transition-colors">
-                                                        <td className="p-2 font-medium">{r.month} {r.year}</td>
-                                                        <td className="p-2 text-slate-600">{branchName}</td>
-                                                        <td className="p-2 text-slate-600">{r.department}</td>
-                                                        <td className="p-2 text-center font-bold text-emerald-600">{Number(r.work_acc)}</td>
-                                                        <td className="p-2 text-center text-slate-500">{Number(r.itinere_acc)}</td>
-                                                        <td className="p-2 text-center text-slate-500">{Number(r.mission_acc)}</td>
-                                                        <td className="p-2 text-center text-slate-500">{Number(r.recreation_acc)}</td>
-                                                        <td className="p-2 flex gap-2 justify-end">
-                                                            <button onClick={()=>handleEdit(r)} className="text-blue-500 hover:text-blue-700 p-1"><Icons.Edit2 className="h-4 w-4"/></button>
-                                                            <button onClick={()=>handleDelete(r.id)} className="text-red-500 hover:text-red-700 p-1"><Icons.Trash2 className="h-4 w-4"/></button>
+                                                    <tr key={r.id} className="border-t hover:bg-slate-50">
+                                                        <td className="p-3 font-medium">{r.month} {r.year}</td>
+                                                        <td className="p-3 text-slate-600">{branchName}</td>
+                                                        <td className="p-3 text-slate-600">{r.department}</td>
+                                                        <td className="p-3 text-center font-bold">{Number(r.work_acc||0)}</td>
+                                                        <td className="p-3 text-center">{Number(r.itinere_acc||0)}</td>
+                                                        <td className="p-3 text-center">{Number(r.mission_acc||0)}</td>
+                                                        <td className="p-3 text-center">{Number(r.recreation_acc||0)}</td>
+                                                        <td className="p-3">
+                                                            <div className="flex gap-2 justify-end">
+                                                                <button onClick={()=>handleEdit(r)} className="text-blue-600 hover:text-blue-800 p-2 min-h-0" aria-label="Editar"><Icons.Edit2 className="h-4 w-4"/></button>
+                                                                <button onClick={()=>handleDelete(r.id)} className="text-red-600 hover:text-red-800 p-2 min-h-0" aria-label="Eliminar"><Icons.Trash2 className="h-4 w-4"/></button>
+                                                            </div>
                                                         </td>
                                                     </tr>
                                                 );
@@ -680,7 +1253,7 @@
                                         </tbody>
                                     </table>
                                 </div>
-                            </div>
+                            </section>
                         </div>
                     );
                     break;
@@ -689,6 +1262,49 @@
                         <SettingsOrInputView view='settings' departments={departments} branches={branches} addBranch={addBranch} newBranchName={newBranchName} setNewBranchName={setNewBranchName} newBranchState={newBranchState} setNewBranchState={setNewBranchState} removeBranch={removeBranch} addDept={addDept} newDeptName={newDeptName} setNewDeptName={setNewDeptName} removeDept={removeDept} kValue={kValue} setKValue={setKValue} />
                     );
                     break;
+            }
+
+            if (!accessUser) {
+                return (
+                    <div className="access-screen">
+                        <div className="access-card">
+                            <div className="brand-bar"></div>
+                            <div className="p-5 sm:p-7">
+                                <div className="text-center">
+                                    <img src={OFFICIAL_LOGO} alt="La Movida de SST" className="mx-auto w-24 h-auto object-contain" referrerPolicy="no-referrer" />
+                                    <p className="mt-3 text-[11px] font-extrabold uppercase tracking-[.16em]" style={{color: ACCENT_COLOR}}>De la Reacción a la Prevención</p>
+                                    <h1 className="mt-2 text-2xl font-black text-slate-900">Estadísticas de lesiones de trabajo</h1>
+                                    <p className="mt-1 text-xs font-bold text-slate-500">NVC 474:1997 · NTF 474:2014</p>
+                                </div>
+
+                                <div className="mt-6 rounded-xl bg-sky-50 border border-sky-100 p-3 text-sm text-sky-900">
+                                    <strong>Acceso para integrantes registrados.</strong> Ingrese su cédula y el código de 5 caracteres asignado por La Movida de SST.
+                                </div>
+
+                                <form onSubmit={handleLogin} className="mt-5 space-y-4">
+                                    <div>
+                                        <label className="label-text" htmlFor="login-cedula">Cédula</label>
+                                        <input id="login-cedula" inputMode="numeric" autoComplete="username" value={loginCedula} onChange={e=>setLoginCedula(e.target.value)} className="input-field" placeholder="Ej. 12345678" required />
+                                    </div>
+                                    <div>
+                                        <label className="label-text" htmlFor="login-codigo">Código de registro</label>
+                                        <input id="login-codigo" autoCapitalize="characters" autoComplete="current-password" value={loginCodigo} onChange={e=>setLoginCodigo(e.target.value.replace(/[^a-zA-Z0-9]/g,'').toUpperCase().slice(0,5))} className="input-field" placeholder="5 letras o números" maxLength="5" required />
+                                    </div>
+
+                                    {loginError && <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-700" role="alert">{loginError}</div>}
+
+                                    <button type="submit" disabled={loginLoading} className="btn-primary-action header-btn w-full text-sm py-3 disabled:opacity-60">
+                                        {loginLoading ? 'Verificando acceso…' : 'Ingresar a la herramienta'}
+                                    </button>
+                                </form>
+
+                                <div className="mt-5 text-center text-xs text-slate-500">
+                                    ¿Aún no tienes código? <a href="https://registro.movidasst.com/" target="_blank" rel="noopener noreferrer" className="font-extrabold underline" style={{color: ACCENT_COLOR}}>Registro La Movida SST</a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                );
             }
 
             return (
@@ -730,252 +1346,194 @@
                     {showHelpModal && (
                         <div className="modal-overlay" onClick={() => setShowHelpModal(false)}>
                             <div className="modal-content animate-in zoom-in-95" onClick={e => e.stopPropagation()}>
-                                <div className="flex justify-between items-center mb-4 border-b pb-2">
-                                    <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2"><Icons.HelpCircle className="h-6 w-6 text-indigo-500"/> Guía Rápida de Uso</h3>
-                                    <button onClick={() => setShowHelpModal(false)} className="text-slate-400 hover:text-slate-600"><Icons.X className="h-5 w-5"/></button>
+                                <div className="flex justify-between items-center gap-3 mb-4 border-b pb-3">
+                                    <div>
+                                        <h3 className="text-lg font-extrabold text-slate-800 flex items-center gap-2"><Icons.HelpCircle className="h-6 w-6" style={{color: ACCENT_COLOR}}/> Guía rápida</h3>
+                                        <p className="text-xs text-slate-500 mt-1">NVC 474:1997 · NTF 474:2014 · base activa {(K_OPTIONS.find(o => o.value === kValue) || K_OPTIONS[0]).label} · K = {kValue.toLocaleString('es-VE')}.</p>
+                                    </div>
+                                    <button onClick={() => setShowHelpModal(false)} className="header-btn btn-action px-2" aria-label="Cerrar ayuda"><Icons.X className="h-5 w-5"/></button>
                                 </div>
-                                
-                                <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
-                                    <div className="help-step">
-                                        <div className="help-number">1</div>
-                                        <div>
-                                            <h4 className="font-bold text-sm text-slate-700">Configuración Inicial</h4>
-                                            <p className="text-xs text-slate-500">Vaya a <span className="font-bold text-indigo-600">Config</span> para agregar sus Sucursales y Departamentos. Defina la constante K (1.000.000 o 200.000).</p>
-                                        </div>
-                                    </div>
-                                    <div className="help-step">
-                                        <div className="help-number">2</div>
-                                        <div>
-                                            <h4 className="font-bold text-sm text-slate-700">Registro de Datos</h4>
-                                            <p className="text-xs text-slate-500">En <span className="font-bold text-emerald-600">Cargar Mes</span> ingrese las Horas Hombre, Trabajadores y eventos ocurridos. Puede editar registros abajo en la tabla.</p>
-                                        </div>
-                                    </div>
-                                    <div className="help-step">
-                                        <div className="help-number">3</div>
-                                        <div>
-                                            <h4 className="font-bold text-sm text-slate-700">Análisis y Filtros</h4>
-                                            <p className="text-xs text-slate-500">En <span className="font-bold text-emerald-600">Ver Datos</span>, use los filtros superiores para ver estadísticas específicas por Sucursal, Depto. o Tipo de Evento.</p>
-                                        </div>
-                                    </div>
-                                    <div className="help-step">
-                                        <div className="help-number">4</div>
-                                        <div>
-                                            <h4 className="font-bold text-sm text-slate-700">Reportes y Respaldo</h4>
-                                            <p className="text-xs text-slate-500">Use <span className="font-bold text-emerald-600">PDF PRO</span> para reportes oficiales. Use <span className="font-bold text-slate-600">Guardar Excel</span> para descargar una copia de seguridad o plantilla vacía.</p>
-                                        </div>
-                                    </div>
-                                    <div className="help-step">
-                                        <div className="help-number">5</div>
-                                        <div>
-                                            <h4 className="font-bold text-sm text-slate-700">Modo Cartelera</h4>
-                                            <p className="text-xs text-slate-500">Active el botón <span className="font-bold text-slate-600">Cartelera</span> para una vista limpia ideal para pantallas en planta. Use 'Salir' para volver.</p>
-                                        </div>
-                                    </div>
 
-                                    {/* SECCIÓN DE DEFINICIONES AGREGADA */}
-                                    <div className="mt-6 pt-4 border-t border-slate-200">
-                                        <h4 className="font-bold text-sm text-slate-800 mb-3 flex items-center gap-2"><Icons.Info className="h-4 w-4 text-emerald-500"/> Definiciones Clave</h4>
-                                        <div className="space-y-3 text-xs text-slate-600 bg-slate-50 p-3 rounded-lg border border-slate-100">
-                                            <div>
-                                                <strong className="text-slate-800 block">Días Perdidos:</strong>
-                                                Total de días de reposo médico continuos generados por accidentes de trabajo con baja (tiempo perdido).
-                                            </div>
-                                            <div>
-                                                <strong className="text-slate-800 block">Días Cargados:</strong>
-                                                Días equivalentes asignados (penalización) según la norma por incapacidad permanente o fallecimiento.
-                                            </div>
-                                            <div>
-                                                <strong className="text-emerald-700 block">IFN (Índice de Frecuencia Neta):</strong>
-                                                Mide la cantidad de accidentes con baja por cada K horas hombre de exposición. <br/>
-                                                <em>Fórmula: (Accidentes con Baja * K) / H.H.E.</em>
-                                            </div>
-                                            <div>
-                                                <strong className="text-sky-700 block">IFB (Índice de Frecuencia Bruta):</strong>
-                                                Mide el total de accidentes (con y sin baja) por cada K horas hombre de exposición. <br/>
-                                                <em>Fórmula: (Total Accidentes * K) / H.H.E.</em>
-                                            </div>
-                                            <div>
-                                                <strong className="text-red-700 block">IS (Índice de Severidad):</strong>
-                                                Mide la gravedad a través de los días perdidos y cargados por cada K horas hombre. <br/>
-                                                <em>Fórmula: ((Días Perdidos + Días Cargados) * K) / H.H.E.</em>
-                                            </div>
+                                <div className="space-y-4">
+                                    <div className="help-step"><div className="help-number">1</div><div><h4 className="font-bold text-sm text-slate-700">Configure la estructura</h4><p className="text-xs text-slate-500">En Configuración agregue sucursales y departamentos y seleccione la base de cálculo: <strong>OIT K = 1.000.000</strong> u <strong>OSHA K = 200.000</strong>.</p></div></div>
+                                    <div className="help-step"><div className="help-number">2</div><div><h4 className="font-bold text-sm text-slate-700">Registre exposición</h4><p className="text-xs text-slate-500">Use <strong>HHE</strong> para trabajo y <strong>HHT</strong> para trayecto. Incluya en HHE las horas reales trabajadas y las horas extras cuando corresponda.</p></div></div>
+                                    <div className="help-step"><div className="help-number">3</div><div><h4 className="font-bold text-sm text-slate-700">Separe NLT y NLPT</h4><p className="text-xs text-slate-500"><strong>NLT</strong> es el total de lesiones y <strong>NLPT</strong> son las lesiones con tiempo perdido/discapacidad. NLPT no se infiere automáticamente de los días.</p></div></div>
+                                    <div className="help-step"><div className="help-number">4</div><div><h4 className="font-bold text-sm text-slate-700">Elija el cálculo</h4><p className="text-xs text-slate-500">Trabajo usa HHE; In itinere usa HHT; Combinado suma Trabajo + In itinere y usa HHE + HHT. Misión y recreativos quedan como registros complementarios.</p></div></div>
+                                    <div className="help-step"><div className="help-number">5</div><div><h4 className="font-bold text-sm text-slate-700">Exporte y respalde</h4><p className="text-xs text-slate-500">Genere PDF, gráficos PNG o Excel. Mientras los registros no estén sincronizados con Supabase, el navegador es el almacenamiento principal: descargue un Excel de respaldo con frecuencia. Los respaldos de la versión antigua pueden importarse, pero deberán completarse NLPT y HHT si esos datos no existían.</p></div></div>
+
+                                    <div className="mt-5 pt-4 border-t border-slate-200">
+                                        <h4 className="font-extrabold text-sm text-slate-800 mb-3 flex items-center gap-2"><Icons.Calculator className="h-4 w-4" style={{color: SUCCESS_COLOR}}/> Fórmulas</h4>
+                                        <div className="space-y-3 text-xs text-slate-600 bg-slate-50 p-3 rounded-xl border border-slate-100">
+                                            <div><strong className="text-slate-800 block">IFN</strong>(NLPT × {kValue.toLocaleString('es-VE')}) / horas correspondientes.</div>
+                                            <div><strong className="text-slate-800 block">IFB</strong>(NLT × {kValue.toLocaleString('es-VE')}) / horas correspondientes.</div>
+                                            <div><strong className="text-slate-800 block">IS</strong>((TDP + días cargados adicionales) × {kValue.toLocaleString('es-VE')}) / horas correspondientes.</div>
+                                            <div><strong className="text-slate-800 block">IA</strong>(N.º de accidentes × 100) / N.º de trabajadores. Accidentes y NLT se registran por separado. El valor anual mostrado con * usa el promedio mensual de trabajadores de los meses con datos.</div>
                                         </div>
                                     </div>
+                                    <div className="technical-note rounded-xl p-3 text-xs text-slate-600">
+                                        <strong>Decisión de implementación:</strong> el campo “días cargados adicionales” se reserva para los cargos por fatalidad/discapacidad permanente/tabla aplicables, evitando duplicar manualmente los días perdidos temporales en el numerador del IS.
+                                    </div>
                                 </div>
-                                
-                                <div className="mt-6 pt-4 border-t text-center">
-                                    <button onClick={() => setShowHelpModal(false)} className="px-6 py-2 bg-indigo-500 text-white rounded-full font-bold text-sm hover:bg-indigo-600 transition-colors">¡Entendido!</button>
+
+                                <div className="mt-6 pt-4 border-t">
+                                    <button onClick={() => setShowHelpModal(false)} className="btn-primary-action header-btn w-full">Entendido</button>
                                 </div>
                             </div>
                         </div>
                     )}
 
-                    {!billboardMode && <header className="bg-white shadow-sm border-b border-slate-200 sticky top-0 z-50">
-                        <div className="max-w-7xl mx-auto p-3 flex flex-col md:flex-row justify-between items-center gap-4">
-                            <div className="flex items-center gap-4">
-                                <div className="flex flex-col">
-                                    <h1 className="text-2xl font-extrabold text-slate-800 tracking-tight leading-none">Gestión de Estadísticas de Accidentes</h1>
+                    {!billboardMode && <header className="bg-white/95 backdrop-blur shadow-sm border-b border-slate-200 sticky top-0 z-50">
+                        <div className="max-w-7xl mx-auto px-3 sm:px-5 py-3">
+                            <div className="flex items-center justify-between gap-3">
+                                <div className="flex items-center gap-3 min-w-0">
+                                    <img src={OFFICIAL_LOGO} alt="La Movida de SST" className="brand-logo" referrerPolicy="no-referrer" />
+                                    <div className="min-w-0">
+                                        <div className="text-[11px] font-extrabold uppercase tracking-[.12em]" style={{color: ACCENT_COLOR}}>La Movida de SST</div>
+                                        <h1 className="font-black text-base sm:text-xl text-slate-900 leading-tight truncate">Estadísticas de lesiones de trabajo</h1>
+                                        <p className="text-[11px] sm:text-xs text-slate-500 mt-0.5">NVC 474:1997 · NTF 474:2014 · {(K_OPTIONS.find(o => o.value === kValue) || K_OPTIONS[0]).label} · K = {kValue.toLocaleString('es-VE')}</p>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-2 no-print">
+                                    <div className="hidden md:block text-right leading-tight mr-1">
+                                        <div className="text-xs font-extrabold text-slate-700">{[accessUser?.nombres, accessUser?.apellidos].filter(Boolean).join(' ') || 'Integrante'}</div>
+                                        <div className="text-[10px] text-slate-400">C.I. {accessUser?.cedula}</div>
+                                    </div>
+                                    <button onClick={() => setShowHelpModal(true)} className="header-btn btn-help-action px-3" title="Ayuda"><Icons.HelpCircle className="h-4 w-4"/><span className="hidden sm:inline">Ayuda</span></button>
+                                    <button onClick={handleLogout} className="header-btn btn-action px-3" title="Cerrar acceso"><Icons.X className="h-4 w-4"/><span className="hidden sm:inline">Salir</span></button>
                                 </div>
                             </div>
-                            {/* BOTONES CON CLASE NO-PRINT PARA QUE NO SALGAN EN EL PDF */}
-                            <div className="flex flex-col items-end gap-2 no-print">
-                                <div className="flex gap-2">
-                                    {/* Botón Ayuda */}
-                                    <button onClick={() => setShowHelpModal(true)} className="header-btn btn-help-action" title="Ayuda / Instrucciones"><Icons.HelpCircle className="h-4 w-4"/> Ayuda</button>
-                                    
-                                    {/* Botón Reiniciar ahora abre el modal */}
-                                    <button onClick={handleReset} className="header-btn btn-danger-action" title="Borrar todo"><Icons.RotateCcw className="h-4 w-4"/> Reiniciar</button>
-                                    <button onClick={() => setBillboardMode(true)} className="header-btn btn-action" title="Vista limpia"><Icons.Layout className="h-4 w-4"/> Cartelera</button>
-                                    <button onClick={handleDownloadPDF} className="header-btn btn-primary-action" title="Descargar Reporte"><Icons.Download className="h-4 w-4"/> PDF PRO</button>
-                                    <button onClick={handleLoadDemo} className="header-btn btn-warn-action" title="Datos Prueba"><Icons.Database className="h-4 w-4"/> Cargar Demo</button><button onClick={() => setView('settings')} className="header-btn btn-action" title="Configuración"><Icons.Settings className="h-4 w-4"/> Config</button><button onClick={exportData} className="header-btn btn-action" title="Guardar Excel"><Icons.Save className="h-4 w-4"/> Guardar Excel</button><label className="header-btn btn-action cursor-pointer" title="Cargar Excel"><Icons.Upload className="h-4 w-4"/> Importar Excel <input type="file" accept=".xlsx, .xls" className="hidden" onChange={importData}/></label></div>
-                                <div className="flex gap-2"><button onClick={() => { setView('input'); setEditingId(null); setFormData({...INITIAL_FORM, department: departments[0], branchId: branches[0].id}); }} className={`flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold border ${view==='input' ? 'bg-emerald-50 border-emerald-500 text-emerald-700' : 'bg-white text-slate-500'}`}><Icons.Plus className="h-3 w-3"/> Cargar Mes</button><button onClick={() => setView('dashboard')} className={`flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold border ${view==='dashboard' ? 'bg-emerald-50 border-emerald-500 text-emerald-700' : 'bg-white text-slate-500'}`}><Icons.BarChart3 className="h-3 w-3"/> Ver Datos</button></div>
+
+                            <div className="mt-3 no-print">
+                                <div className="mobile-scroll md:flex-wrap">
+                                    <button onClick={() => { setView('input'); setEditingId(null); setFormData({...INITIAL_FORM, department: departments[0] || '', branchId: branches[0]?.id || ''}); }} className={`header-btn ${view==='input' ? 'btn-primary-action' : 'btn-action'}`}><Icons.Plus className="h-4 w-4"/> Registrar</button>
+                                    <button onClick={() => setView('dashboard')} className={`header-btn ${view==='dashboard' ? 'btn-primary-action' : 'btn-action'}`}><Icons.BarChart3 className="h-4 w-4"/> Panel</button>
+                                    <button onClick={() => setView('settings')} className={`header-btn ${view==='settings' ? 'btn-primary-action' : 'btn-action'}`}><Icons.Settings className="h-4 w-4"/> Configuración</button>
+                                    <button onClick={handleDownloadPDF} className="header-btn btn-action"><Icons.Download className="h-4 w-4"/> PDF</button>
+                                    <button onClick={exportData} className="header-btn btn-action"><Icons.Save className="h-4 w-4"/> Excel</button>
+                                    <label className="header-btn btn-action cursor-pointer"><Icons.Upload className="h-4 w-4"/> Importar<input type="file" accept=".xlsx,.xls" className="hidden" onChange={importData}/></label>
+                                    <button onClick={() => setBillboardMode(true)} className="header-btn btn-action"><Icons.Layout className="h-4 w-4"/> Cartelera</button>
+                                    <button onClick={handleLoadDemo} className="header-btn btn-warn-action"><Icons.Database className="h-4 w-4"/> Demo</button>
+                                    <button onClick={handleReset} className="header-btn btn-danger-action"><Icons.RotateCcw className="h-4 w-4"/> Reiniciar</button>
+                                </div>
                             </div>
                         </div>
-                        <div className="h-1 w-full" style={{ backgroundColor: BRAND_COLOR }}></div>
+                        <div className="brand-bar"></div>
                     </header>}
 
-                    {billboardMode && <div className="p-6 bg-white border-b flex justify-between items-center print:hidden no-print">
-                        <h1 className="text-2xl font-bold text-slate-800">Modo Cartelera</h1>
-                        <div className="flex gap-2">
+                    {billboardMode && <div className="p-3 sm:p-6 bg-white border-b flex flex-col sm:flex-row gap-3 justify-between sm:items-center print:hidden no-print">
+                        <h1 className="text-lg sm:text-2xl font-bold text-slate-800">Modo Cartelera</h1>
+                        <div className="flex gap-2 w-full sm:w-auto">
                             <button onClick={handleDownloadPDF} className="bg-slate-800 text-white px-4 py-2 rounded flex gap-2 items-center hover:bg-slate-700 transition-colors"><Icons.Download className="h-4 w-4"/> Descargar PDF</button>
                             <button onClick={() => setBillboardMode(false)} className="text-red-500 font-bold underline px-4 py-2">Salir</button>
                         </div>
                     </div>}
 
-                    <main id="dashboard-content" className={`mx-auto ${billboardMode?'p-8 bg-white max-w-none':'p-6 max-w-7xl'}`}>
-                         {/* Se eliminó la clase 'no-print' para que este encabezado salga en el PDF y se agregó el año */}
-                         <div className="text-center py-6 mb-4">
-                            <h1 className="text-3xl md:text-4xl font-extrabold uppercase tracking-tight text-slate-800 mb-2">La Movida de SST DAO Network</h1>
-                            <h2 className="text-xl md:text-2xl font-bold uppercase tracking-tight" style={{ color: NEUTRAL_COLOR }}>Estadísticas de Accidentes <span style={{ color: BRAND_COLOR }}>Norma COVENIN 474</span> - {filterYear}</h2>
-                            <div className="mt-4 text-xs md:text-sm text-slate-500 flex flex-col md:flex-row justify-center items-center gap-2 md:gap-6 border-t border-slate-200 pt-4 mx-auto max-w-4xl">
+                    <main id="dashboard-content" className={`mx-auto ${billboardMode?'p-4 sm:p-8 bg-white max-w-none':'px-3 sm:px-5 py-5 sm:py-7 max-w-7xl'}`}>
+                        <div className="text-center pb-5 sm:pb-7 mb-4">
+                            <img src={OFFICIAL_LOGO} alt="La Movida de SST" className="mx-auto w-24 sm:w-28 h-auto object-contain mb-3" referrerPolicy="no-referrer" />
+                            <p className="text-[11px] sm:text-xs font-extrabold uppercase tracking-[.16em]" style={{color: ACCENT_COLOR}}>De la Reacción a la Prevención</p>
+                            <h1 className="text-xl sm:text-3xl font-black tracking-tight text-slate-900 mt-1">Estadísticas de lesiones de trabajo</h1>
+                            <h2 className="text-sm sm:text-lg font-bold mt-1" style={{color: BRAND_COLOR}}>NVC 474:1997 · NTF 474:2014 · {(K_OPTIONS.find(o => o.value === kValue) || K_OPTIONS[0]).label} K = {kValue.toLocaleString('es-VE')}</h2>
+                            <div className="mt-4 text-[11px] sm:text-xs text-slate-500 flex flex-wrap justify-center items-center gap-x-4 gap-y-1 border-t border-slate-200 pt-4 mx-auto max-w-4xl">
                                <span><Icons.User className="inline h-3 w-3 mr-1"/>Elaborado por: David Linares Brea</span>
                                <span><Icons.Globe className="inline h-3 w-3 mr-1"/>www.movidasst.com</span>
-                               <span><Icons.Mail className="inline h-3 w-3 mr-1"/>movidasst@gmail.com</span>
-                               <span><Icons.Phone className="inline h-3 w-3 mr-1"/>+56 9 6861 5650</span>
                             </div>
                         </div>
-                         {content}
+                        {!billboardMode && (
+                            <div className="storage-warning no-print max-w-5xl mx-auto mb-5 rounded-2xl p-4 sm:p-5">
+                                <div className="flex items-start gap-3">
+                                    <Icons.AlertCircle className="h-5 w-5 flex-shrink-0 mt-0.5"/>
+                                    <div className="min-w-0 flex-1">
+                                        <h3 className="font-black text-sm">Importante: los datos se guardan solamente en este navegador</h3>
+                                        <p className="text-xs sm:text-sm mt-1 leading-relaxed">
+                                            Los registros, sucursales, departamentos y la configuración se almacenan localmente en este dispositivo; <strong>no se guardan todavía en Supabase</strong>. Cerrar la pestaña o el navegador normalmente no los elimina, pero pueden perderse si borra los datos del sitio o del navegador, usa navegación privada, cambia de navegador o dispositivo, reinstala el navegador o se limpia el almacenamiento local.
+                                        </p>
+                                        <div className="mt-3 flex flex-col sm:flex-row sm:items-center gap-2">
+                                            <button type="button" onClick={exportData} className="header-btn bg-white border border-amber-300 text-amber-900"><Icons.Save className="h-4 w-4"/> Descargar respaldo Excel</button>
+                                            <span className="text-[11px] sm:text-xs font-semibold">Recomendación: descargue un respaldo al finalizar cada sesión de trabajo.</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                        {content}
                     </main>
                 </div>
             );
         }
 
-        const SettingsOrInputView = ({ view, departments, branches, formData, handleInputChange, handleSubmit, cancelEdit, editingId, addBranch, newBranchName, setNewBranchName, newBranchState, setNewBranchState, removeBranch, addDept, newDeptName, setNewDeptName, removeDept, kValue, setKValue, records, handleEdit, handleDelete }) => {
-            if (view === 'settings') return (
-                <div className="max-w-4xl mx-auto animate-in fade-in space-y-6 no-print">
-                    <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6"><div className="flex gap-4"><label className="font-bold text-sm">Constante K</label><div className="flex gap-2"><button onClick={()=>setKValue(1000000)} className={`p-2 border rounded ${kValue===1000000?'bg-emerald-50 border-emerald-500 text-emerald-700':''}`}>1.000.000 (COVENIN)</button><button onClick={()=>setKValue(200000)} className={`p-2 border rounded ${kValue===200000?'bg-blue-50 border-blue-500 text-blue-700':''}`}>200.000 (OSHA)</button></div></div></div>
-                    <div className="grid md:grid-cols-2 gap-6">
-                        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4"><h3 className="font-bold mb-4">Sucursales</h3><form onSubmit={addBranch} className="flex gap-2 mb-4"><input value={newBranchName} onChange={e=>setNewBranchName(e.target.value)} className="input-field flex-1" placeholder="Nombre..." /><select value={newBranchState} onChange={e=>setNewBranchState(e.target.value)} className="input-field flex-1">{VENEZUELA_STATES.map(s=><option key={s} value={s}>{s}</option>)}</select><button className="btn-primary-action header-btn">+</button></form><div className="max-h-60 overflow-y-auto space-y-2">{branches.map(b=><div key={b.id} className="flex justify-between p-2 bg-slate-50 rounded border border-slate-100 text-sm"><span>{b.name} ({b.state})</span><button onClick={()=>removeBranch(b.id)} className="text-red-400"><Icons.Trash2 className="h-4 w-4"/></button></div>)}</div></div>
-                        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4"><h3 className="font-bold mb-4">Departamentos</h3><form onSubmit={addDept} className="flex gap-2 mb-4"><input value={newDeptName} onChange={e=>setNewDeptName(e.target.value)} className="input-field flex-1" placeholder="Nombre..." /><button className="btn-primary-action header-btn">+</button></form><div className="max-h-60 overflow-y-auto space-y-2">{departments.map(d=><div key={d} className="flex justify-between p-2 bg-slate-50 rounded border border-slate-100 text-sm"><span>{d}</span><button onClick={()=>removeDept(d)} className="text-red-400"><Icons.Trash2 className="h-4 w-4"/></button></div>)}</div></div>
-                    </div>
-                </div>
-            );
-            if (view === 'input') return (
-                <div className="animate-in fade-in no-print">
-                    <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden mb-8">
-                        <div className="p-4 flex items-center justify-between border-b border-slate-100 bg-slate-50">
-                            <h2 className="font-bold flex items-center gap-2 text-lg" style={{ color: NEUTRAL_COLOR }}>{editingId ? <><Icons.Edit2 className="h-5 w-5 text-amber-500" /> Editando</> : <><Icons.FileText className="h-5 w-5" style={{ color: BRAND_COLOR }} /> Nuevo Registro</>}</h2>
-                            {editingId && <button onClick={cancelEdit} className="text-xs bg-slate-200 px-3 py-1 rounded">Cancelar</button>}
-                        </div>
-                        <form onSubmit={handleSubmit} className="p-6 space-y-8">
-                            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                                <div><label className="label-text">Sucursal</label><select name="branchId" value={formData.branchId} onChange={handleInputChange} className="input-field">{branches.map(b=><option key={b.id} value={b.id}>{b.name}</option>)}</select></div>
-                                <div><label className="label-text">Depto</label><select name="department" value={formData.department} onChange={handleInputChange} className="input-field">{departments.map(d=><option key={d} value={d}>{d}</option>)}</select></div>
-                                <div className="grid grid-cols-2 gap-2"><div><label className="label-text">Mes</label><select name="month" value={formData.month} onChange={handleInputChange} className="input-field">{MONTHS.map(m=><option key={m} value={m}>{m}</option>)}</select></div><div><label className="label-text">Año</label><input type="number" name="year" value={formData.year} onChange={handleInputChange} className="input-field"/></div></div>
-                                <div className="grid grid-cols-2 gap-2"><div><label className="label-text">H.H.E.</label><input type="number" name="hours" value={formData.hours} onChange={handleInputChange} className="input-field"/></div><div><label className="label-text">Trab.</label><input type="number" name="workers" value={formData.workers} onChange={handleInputChange} className="input-field"/></div></div>
-                            </div>
-                            <hr className="border-slate-100"/>
-                            
-                            <div className="grid grid-cols-1 gap-4">
-                                <div className="bg-white p-4 rounded border border-emerald-200 bg-emerald-50">
-                                    <div className="flex items-center gap-2 mb-2 text-xs font-bold uppercase text-emerald-700">
-                                        <Icons.Briefcase className="h-4 w-4"/> Accidente de Trabajo
-                                    </div>
-                                    <div className="grid grid-cols-3 gap-2">
-                                        <div><label className="text-[10px]">Eventos</label><input type="number" name="work_acc" value={formData.work_acc} onChange={handleInputChange} className="input-field h-8 border-emerald-300" /></div>
-                                        <div><label className="text-[10px]">D. Perd.</label><input type="number" name="work_daysLost" value={formData.work_daysLost} onChange={handleInputChange} className="input-field h-8 border-emerald-300" /></div>
-                                        <div><label className="text-[10px]">D. Carg.</label><input type="number" name="work_daysCharged" value={formData.work_daysCharged} onChange={handleInputChange} className="input-field h-8 border-emerald-300" /></div>
-                                    </div>
-                                    <p className="text-[10px] text-emerald-600 mt-2 italic">
-                                        * Nota: Si registra días (Perdidos o Cargados), el evento se contará automáticamente como "Con Baja" para el cálculo del IFN. Si los días son 0, se contará como "Sin Baja". ESTA NOTA TAMBIÉN APLICA PARA ITINERE, EN MISIÓN Y RECREATIVOS.
-                                    </p>
+        const SettingsOrInputView = ({ view, departments, branches, addBranch, newBranchName, setNewBranchName, newBranchState, setNewBranchState, removeBranch, addDept, newDeptName, setNewDeptName, removeDept, kValue, setKValue }) => {
+            if (view !== 'settings') return null;
+            return (
+                <div className="max-w-5xl mx-auto animate-in fade-in space-y-5 no-print">
+                    <section className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-5">
+                        <div className="flex items-start gap-3">
+                            <div className="p-2 rounded-xl bg-sky-50" style={{color: ACCENT_COLOR}}><Icons.Calculator className="h-5 w-5"/></div>
+                            <div className="flex-1">
+                                <h2 className="font-black text-slate-900">Configuración técnica</h2>
+                                <p className="text-sm text-slate-500 mt-1">Seleccione la base con la que desea expresar los índices. La aplicación usa <strong>OIT K = 1.000.000</strong> por defecto y permite cambiar a <strong>OSHA K = 200.000</strong>.</p>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
+                                    {K_OPTIONS.map(option => (
+                                        <button key={option.value} type="button" onClick={() => setKValue(option.value)} className={`text-left rounded-xl border p-3 transition ${kValue === option.value ? 'border-sky-500 bg-sky-50 ring-2 ring-sky-100' : 'border-slate-200 bg-white hover:bg-slate-50'}`}>
+                                            <div className="flex items-center justify-between gap-3"><strong className="text-sm text-slate-800">{option.label}</strong>{kValue === option.value && <span className="text-[10px] font-black uppercase text-sky-700">Activo</span>}</div>
+                                            <div className="text-lg font-black mt-1" style={{color: BRAND_COLOR}}>K = {option.value.toLocaleString('es-VE')}</div>
+                                            <div className="text-xs text-slate-500 mt-1">{option.description}</div>
+                                        </button>
+                                    ))}
                                 </div>
                             </div>
-
-                            <div className="grid grid-cols-3 gap-4">
-                                <CategoryCard icon={Icons.Truck} title="In Itinere" accName="itinere_acc" daysLostName="itinere_daysLost" daysChargedName="itinere_daysCharged" formData={formData} onChange={handleInputChange}/>
-                                <CategoryCard icon={Icons.Plane} title="En Misión" accName="mission_acc" daysLostName="mission_daysLost" daysChargedName="mission_daysCharged" formData={formData} onChange={handleInputChange}/>
-                                <CategoryCard icon={Icons.PartyPopper} title="Recreativos" accName="recreation_acc" daysLostName="recreation_daysLost" daysChargedName="recreation_daysCharged" formData={formData} onChange={handleInputChange}/>
-                            </div>
-                            <div className="flex justify-end gap-2"><button type="submit" className="btn-primary-action header-btn px-4 py-2 rounded text-sm">Guardar</button></div>
-                        </form>
-                    </div>
-                    <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                        <div className="p-4 border-b border-slate-100 bg-slate-50 font-bold text-sm">Registros Existentes</div>
-                        <div className="overflow-x-auto max-h-60">
-                            <table className="w-full text-xs text-left">
-                                <thead className="bg-slate-50">
-                                    <tr>
-                                        <th className="p-2">Fecha</th>
-                                        <th className="p-2">Sucursal</th>
-                                        <th className="p-2">Depto</th>
-                                        <th className="p-2 text-center" title="Accidentes de Trabajo">Trab.</th>
-                                        <th className="p-2 text-center" title="In Itinere">Itin.</th>
-                                        <th className="p-2 text-center" title="En Misión">Mis.</th>
-                                        <th className="p-2 text-center" title="Recreativos">Rec.</th>
-                                        <th className="p-2 text-right">Acciones</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {records.slice().reverse().map(r => {
-                                        const branchName = branches.find(b => b.id === r.branchId)?.name || 'N/A';
-                                        return (
-                                            <tr key={r.id} className="border-t hover:bg-slate-50 transition-colors">
-                                                <td className="p-2 font-medium">{r.month} {r.year}</td>
-                                                <td className="p-2 text-slate-600">{branchName}</td>
-                                                <td className="p-2 text-slate-600">{r.department}</td>
-                                                <td className="p-2 text-center font-bold text-emerald-600">{Number(r.work_acc)}</td>
-                                                <td className="p-2 text-center text-slate-500">{Number(r.itinere_acc)}</td>
-                                                <td className="p-2 text-center text-slate-500">{Number(r.mission_acc)}</td>
-                                                <td className="p-2 text-center text-slate-500">{Number(r.recreation_acc)}</td>
-                                                <td className="p-2 flex gap-2 justify-end">
-                                                    <button onClick={()=>handleEdit(r)} className="text-blue-500 hover:text-blue-700 p-1"><Icons.Edit2 className="h-4 w-4"/></button>
-                                                    <button onClick={()=>handleDelete(r.id)} className="text-red-500 hover:text-red-700 p-1"><Icons.Trash2 className="h-4 w-4"/></button>
-                                                </td>
-                                            </tr>
-                                        );
-                                    })}
-                                </tbody>
-                            </table>
                         </div>
+                    </section>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                        <section className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-5">
+                            <h3 className="font-extrabold mb-4 text-slate-800">Sucursales</h3>
+                            <form onSubmit={addBranch} className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-2 mb-4">
+                                <input value={newBranchName} onChange={e=>setNewBranchName(e.target.value)} className="input-field" placeholder="Nombre de sucursal" required />
+                                <select value={newBranchState} onChange={e=>setNewBranchState(e.target.value)} className="input-field">{VENEZUELA_STATES.map(state=><option key={state} value={state}>{state}</option>)}</select>
+                                <button className="btn-primary-action header-btn px-4" aria-label="Agregar sucursal"><Icons.Plus className="h-4 w-4"/><span className="sm:hidden">Agregar</span></button>
+                            </form>
+                            <div className="max-h-64 overflow-y-auto space-y-2">
+                                {branches.map(branch=><div key={branch.id} className="flex items-center justify-between gap-3 p-3 bg-slate-50 rounded-xl border border-slate-100 text-sm"><span className="min-w-0"><strong className="block truncate">{branch.name}</strong><span className="text-xs text-slate-500">{branch.state}</span></span><button onClick={()=>removeBranch(branch.id)} className="header-btn btn-danger-action px-2" aria-label={`Eliminar ${branch.name}`}><Icons.Trash2 className="h-4 w-4"/></button></div>)}
+                            </div>
+                        </section>
+
+                        <section className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-5">
+                            <h3 className="font-extrabold mb-4 text-slate-800">Departamentos</h3>
+                            <form onSubmit={addDept} className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-2 mb-4">
+                                <input value={newDeptName} onChange={e=>setNewDeptName(e.target.value)} className="input-field" placeholder="Nombre del departamento" required />
+                                <button className="btn-primary-action header-btn px-4"><Icons.Plus className="h-4 w-4"/> Agregar</button>
+                            </form>
+                            <div className="max-h-64 overflow-y-auto space-y-2">
+                                {departments.map(dept=><div key={dept} className="flex items-center justify-between gap-3 p-3 bg-slate-50 rounded-xl border border-slate-100 text-sm"><span className="font-semibold truncate">{dept}</span><button onClick={()=>removeDept(dept)} className="header-btn btn-danger-action px-2" aria-label={`Eliminar ${dept}`}><Icons.Trash2 className="h-4 w-4"/></button></div>)}
+                            </div>
+                        </section>
                     </div>
                 </div>
             );
-            return null;
         };
 
-        const CategoryCard = ({ icon: Icon, title, accName, daysLostName, daysChargedName, formData, onChange }) => (
-            <div className="bg-white p-4 rounded border border-slate-200">
-                <div className="flex items-center gap-2 mb-2 text-xs font-bold uppercase text-slate-500">
-                    <Icon className="h-4 w-4"/>{title}
-                </div>
-                <div className="grid grid-cols-3 gap-2">
-                    <div>
-                        <label className="text-[10px]">Eventos</label>
-                        <input type="number" name={accName} value={formData[accName]} onChange={onChange} className="input-field h-8" />
+        const MetricInputCard = ({ icon: CardIcon, title, tone = 'neutral', supplemental = false, accidentName, accName, lostTimeName, daysLostName, daysChargedName, formData, onChange }) => {
+            const tones = {
+                work: 'border-blue-200 bg-blue-50/40',
+                itinere: 'border-cyan-200 bg-cyan-50/40',
+                neutral: 'border-slate-200 bg-white'
+            };
+            const titleTone = tone === 'work' ? 'text-blue-900' : tone === 'itinere' ? 'text-cyan-900' : 'text-slate-700';
+            return (
+                <section className={`rounded-2xl border p-4 ${tones[tone] || tones.neutral}`}>
+                    <div className={`flex items-center gap-2 mb-3 font-extrabold text-sm ${titleTone}`}><CardIcon className="h-4 w-4"/>{title}</div>
+                    <div className="grid grid-cols-2 gap-3">
+                        {accidentName && <div className="col-span-2"><label className="label-text">N.º accidentes · para IA</label><input type="number" min="0" step="1" name={accidentName} value={formData[accidentName]} onChange={onChange} className="input-field" inputMode="numeric"/></div>}
+                        <div><label className="label-text">{supplemental ? 'Eventos registrados' : 'NLT · lesiones totales'}</label><input type="number" min="0" step="1" name={accName} value={formData[accName]} onChange={onChange} className="input-field" inputMode="numeric"/></div>
+                        <div><label className="label-text">{supplemental ? 'Con tiempo perdido' : 'NLPT · con tiempo perdido'}</label><input type="number" min="0" step="1" name={lostTimeName} value={formData[lostTimeName]} onChange={onChange} className="input-field" inputMode="numeric"/></div>
+                        <div><label className="label-text">{supplemental ? 'Días perdidos' : 'TDP · días perdidos'}</label><input type="number" min="0" step="1" name={daysLostName} value={formData[daysLostName]} onChange={onChange} className="input-field" inputMode="numeric"/></div>
+                        <div><label className="label-text">{supplemental ? 'Días cargados' : 'Días cargados adicionales'}</label><input type="number" min="0" step="1" name={daysChargedName} value={formData[daysChargedName]} onChange={onChange} className="input-field" inputMode="numeric"/></div>
                     </div>
-                    <div>
-                        <label className="text-[10px]">D. Perd.</label>
-                        <input type="number" name={daysLostName} value={formData[daysLostName]} onChange={onChange} className="input-field h-8" />
-                    </div>
-                    <div>
-                        <label className="text-[10px]">D. Carg.</label>
-                        <input type="number" name={daysChargedName} value={formData[daysChargedName]} onChange={onChange} className="input-field h-8" />
-                    </div>
-                </div>
-            </div>
-        );
-        
+                </section>
+            );
+        };
+
         const SimpleLineChart = ({ data, dataKey1, dataKey2, color1, color2 }) => { 
            if(!data.length) return null; 
            const width = 1200; const height = 400; const padding = 40;
